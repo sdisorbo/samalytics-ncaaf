@@ -6,12 +6,12 @@ export type WinTeam = {
   proj: number; vegas: number | null; actual: number | null;
 };
 export type WinMetrics = {
-  n_train: number; overlap_n: number; seasons: string;
+  n_train: number; overlap_n: number; seasons: string; model_label: string;
   model: { rmse: number; mae: number; w1: number; w2: number };
   vegas: { rmse: number; mae: number; w1: number; w2: number };
   ou: { hits: number; total: number; pct: number };
   edge_bins: { label: string; n: number; hit_pct: number }[];
-  features: { name: string; coef: number }[];
+  features: { name: string; w: number; dir: number; val: string }[];
 };
 type WinsFile = { seasons: string[]; latest: string; metrics: WinMetrics; by_season: Record<string, WinTeam[]> };
 

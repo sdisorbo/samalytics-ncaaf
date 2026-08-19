@@ -39,6 +39,7 @@ OUT = ROOT / "data"
 TRAIN_YEARS = [2018, 2019, 2021, 2022, 2023, 2024]
 FEATURES = ["prev_wins", "prev_sp", "prev_elo", "talent", "recruiting", "ret_prod", "transfer", "sos"]
 RIDGE_LAMBDA = 5.0
+SEED = 17
 
 
 # ── name normalization (CFBD <-> sportsbook <-> our logos) ───────────────────
@@ -175,6 +176,57 @@ def ridge_pred(model, rows):
     return _matrix(rows, model["means"], model["stds"]) @ model["w"] + model["b"]
 
 
+# ── gradient-boosted trees (XGBoost) — the shipped model; ridge is the fallback
+# so a missing package can never break the build ─────────────────────────────
+try:
+    import xgboost as _xgb
+    HAVE_XGB = True
+except Exception:
+    HAVE_XGB = False
+
+XGB_PARAMS = dict(n_estimators=300, learning_rate=0.03, max_depth=2, subsample=0.8,
+                  colsample_bytree=0.8, reg_lambda=3.0, min_child_weight=10,
+                  random_state=SEED, verbosity=0)
+MODEL_LABEL = "gradient-boosted trees (XGBoost)" if HAVE_XGB else "ridge regression"
+
+
+def _raw(rows):
+    X = np.full((len(rows), len(FEATURES)), np.nan)
+    for i, r in enumerate(rows):
+        for j, f in enumerate(FEATURES):
+            v = r["feat"][f]
+            if v is not None and not (isinstance(v, float) and math.isnan(v)):
+                X[i, j] = v
+    return X
+
+def model_fit(rows):
+    if HAVE_XGB:
+        m = _xgb.XGBRegressor(**XGB_PARAMS)
+        m.fit(_raw(rows), np.array([r["wins"] for r in rows], float))
+        return ("xgb", m)
+    return ("ridge", ridge_fit(rows))
+
+def model_pred(model, rows):
+    kind, m = model
+    return m.predict(_raw(rows)) if kind == "xgb" else ridge_pred(m, rows)
+
+def feature_weights(model, rows):
+    """[(feature, weight_for_bar, sign)] — gain importance (xgb) or |coef| (ridge),
+    signed by each feature's univariate correlation with wins."""
+    kind, m = model
+    if kind == "xgb":
+        w = np.asarray(m.feature_importances_, float); w = w / (w.sum() or 1.0)
+    else:
+        w = np.abs(m["w"])
+    X, y = _raw(rows), np.array([r["wins"] for r in rows], float)
+    signs = []
+    for j in range(len(FEATURES)):
+        col = X[:, j]; mask = ~np.isnan(col)
+        c = np.corrcoef(col[mask], y[mask])[0, 1] if mask.sum() > 2 and np.std(col[mask]) > 0 else 0.0
+        signs.append(1 if c >= 0 else -1)
+    return list(zip(FEATURES, w.tolist(), signs))
+
+
 def rmse(e): return float(np.sqrt(np.mean(np.square(e))))
 def mae(e): return float(np.mean(np.abs(e)))
 
@@ -261,12 +313,13 @@ def main():
     print(f"  {len(rows)} team-seasons across {TRAIN_YEARS}")
 
     # leave-one-season-out CV -> genuinely out-of-sample predictions
+    print(f"  model: {MODEL_LABEL}")
     preds = {}
     for holdout in TRAIN_YEARS:
         tr = [r for r in rows if r["year"] != holdout]
         te = [r for r in rows if r["year"] == holdout]
-        m = ridge_fit(tr)
-        for r, p in zip(te, ridge_pred(m, te)):
+        m = model_fit(tr)
+        for r, p in zip(te, model_pred(m, te)):
             preds[(r["year"], r["team"])] = float(p)
     cv_err = [preds[(r["year"], r["team"])] - r["wins"] for r in rows]
     w1 = 100 * sum(abs(e) <= 1 for e in cv_err) / len(cv_err)
@@ -294,11 +347,12 @@ def main():
     print(f"  Model RMSE={rmse(m_err):.3f}   Vegas RMSE={rmse(v_err):.3f}")
     print(f"  Model beats Vegas O/U (|edge|>=0.5): {hits}/{tot} = {100*hits/max(tot,1):.1f}%")
 
-    # feature importances (full-sample standardized coefficients)
-    full = ridge_fit(rows)
-    print("\nStandardized coefficients (wins per 1 SD):")
-    for f, w in sorted(zip(FEATURES, full["w"]), key=lambda kv: -abs(kv[1])):
-        print(f"  {f:11s} {w:+.3f}")
+    # feature weights on the full sample (importance for xgb, |coef| for ridge)
+    full = model_fit(rows)
+    fw = sorted(feature_weights(full, rows), key=lambda t: -t[1])
+    print("\nFeature weights:")
+    for f, w, s in fw:
+        print(f"  {f:11s} {('+' if s > 0 else '-')} {w:.3f}")
 
     # ── metrics block for the site (accuracy table + accuracy-by-edge chart) ──
     def wpct(errs, k):
@@ -312,16 +366,17 @@ def main():
     labels = {"prev_elo": "Prior-year Elo", "prev_sp": "Prior-year SP+", "prev_wins": "Prior-year wins",
               "talent": "Roster talent (247)", "recruiting": "Recruiting class", "ret_prod": "Returning production",
               "transfer": "Transfer-portal haul", "sos": "Strength of schedule"}
+    maxw = max((w for _, w, _ in fw), default=1.0) or 1.0
     metrics = {
-        "n_train": len(rows), "overlap_n": len(m_err),
+        "n_train": len(rows), "overlap_n": len(m_err), "model_label": MODEL_LABEL,
         "model": {"rmse": round(rmse(m_err), 2), "mae": round(mae(m_err), 2),
                   "w1": wpct(m_err, 1), "w2": wpct(m_err, 2)},
         "vegas": {"rmse": round(rmse(v_err), 2), "mae": round(mae(v_err), 2),
                   "w1": wpct(v_err, 1), "w2": wpct(v_err, 2)},
         "ou": {"hits": hits, "total": tot, "pct": round(100 * hits / max(tot, 1), 1)},
         "edge_bins": edge_bins,
-        "features": [{"name": labels[f], "coef": round(float(w), 2)}
-                     for f, w in sorted(zip(FEATURES, full["w"]), key=lambda kv: -abs(kv[1]))],
+        "features": [{"name": labels[f], "w": round(w / maxw, 3), "dir": s,
+                      "val": f"{round(100 * w)}%"} for f, w, s in fw],
         "seasons": f"{min(TRAIN_YEARS)}–{max(TRAIN_YEARS)}",
     }
 
@@ -332,7 +387,7 @@ def main():
         pr_rows = [r for r in build_rows([y], D) if D["meta"].get((y, r["team"]))]
         if not pr_rows:
             continue
-        full_pred = ridge_pred(full, pr_rows)   # fallback for non-training years
+        full_pred = model_pred(full, pr_rows)   # fallback for non-training years
         teams = []
         for r, p in zip(pr_rows, full_pred):
             # use the genuinely out-of-sample CV prediction when we have one

@@ -9,7 +9,7 @@ type Mode = "edge" | "proj";
 
 function ModelPanel() {
   const m = WIN_METRICS;
-  const maxCoef = Math.max(...m.features.map((f) => Math.abs(f.coef)));
+  const maxW = Math.max(...m.features.map((f) => f.w)) || 1;
   const EY0 = 45, EY1 = 60; // edge-chart y-range (%)
   const h = (v: number) => `${((Math.max(EY0, Math.min(EY1, v)) - EY0) / (EY1 - EY0)) * 100}%`;
   return (
@@ -17,10 +17,11 @@ function ModelPanel() {
       <summary>How the model works &amp; how accurate it is</summary>
       <div className="body">
         <p className="text-2xs text-s-muted leading-relaxed max-w-3xl">
-          A ridge regression trained on {m.n_train} team-seasons ({m.seasons}) that predicts a team&apos;s
-          regular-season wins from eight inputs knowable before kickoff. It&apos;s scored
+          Our model is {m.model_label}, trained on {m.n_train} team-seasons ({m.seasons}), predicting a
+          team&apos;s regular-season wins from eight inputs knowable before kickoff. It&apos;s scored
           leave-one-season-out, so the numbers below are genuinely out-of-sample — the model never saw the
-          season it&apos;s graded on. Weights are in wins per standard deviation (green helps, copper hurts):
+          season it&apos;s graded on. Bars are each input&apos;s share of the model&apos;s predictive power
+          (green points toward more wins, copper toward fewer):
         </p>
 
         <div className="feat-bars">
@@ -28,10 +29,10 @@ function ModelPanel() {
             <Fragment key={f.name}>
               <span className="fn">{f.name}</span>
               <span className="ft" style={{
-                width: `${(Math.abs(f.coef) / maxCoef) * 100}%`,
-                background: f.coef >= 0 ? "var(--heat-green)" : "var(--heat-purple)",
+                width: `${(f.w / maxW) * 100}%`,
+                background: f.dir >= 0 ? "var(--heat-green)" : "var(--heat-purple)",
               }} />
-              <span className="fv">{f.coef >= 0 ? "+" : ""}{f.coef.toFixed(2)}</span>
+              <span className="fv">{f.val}</span>
             </Fragment>
           ))}
         </div>
