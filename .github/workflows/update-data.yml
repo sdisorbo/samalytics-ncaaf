@@ -1,0 +1,89 @@
+name: Update NCAAF data
+
+# Rebuilds data/*.json from live ESPN college-football data and commits any
+# changes. Runs on a game-weekend cadence, but ONLY while the NCAAF season is
+# actually happening: the gate below checks ESPN for FBS games within ±9 days
+# and no-ops the job otherwise, so it self-starts when the season kicks off in
+# late August and self-stops once the season is over for the year.
+#
+# GitHub Actions cron is UTC-only. Times below are tuned to Eastern STANDARD
+# time (UTC-5); in Aug–early Nov (Eastern DAYLIGHT time) each run lands ~1 hour
+# later in ET, which is fine for a data refresh.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 4 * * 6'     # Fri 11:00 PM ET  (Friday night, after Fri games)
+    - cron: '0 14 * * 6'    # Sat  9:00 AM ET  (Saturday morning)
+    - cron: '0 22 * * 6'    # Sat  5:00 PM ET  (after the afternoon slate)
+    - cron: '0 4 * * 0'     # Sat 11:00 PM ET  (after the night slate)
+    - cron: '0 14 * * 0'    # Sun  9:00 AM ET  (Sunday morning, weekend final)
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: NCAAF season active? (FBS games within ±9 days)
+        id: gate
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, urllib.request, datetime
+          def active():
+              now = datetime.datetime.now(datetime.timezone.utc)
+              url = ("https://site.api.espn.com/apis/site/v2/sports/football/"
+                     "college-football/scoreboard?groups=80")
+              try:
+                  req = urllib.request.Request(url, headers={"User-Agent": "curl/8.1"})
+                  d = json.loads(urllib.request.urlopen(req, timeout=30).read())
+              except Exception:
+                  return True  # fail open: refresh rather than silently stall
+              for ev in d.get("events", []):
+                  try:
+                      dt = datetime.datetime.fromisoformat(ev["date"].replace("Z", "+00:00"))
+                  except Exception:
+                      continue
+                  if abs((dt - now).days) <= 9:
+                      return True
+              return False
+          print("in_season=true" if active() else "in_season=false")
+          PY
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            grep -q 'in_season=true' "$GITHUB_OUTPUT" || echo "Off-season — no FBS games near today; skipping."
+          fi
+
+      - name: Checkout
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        run: pip install -r scripts/requirements.txt
+
+      - name: Rebuild data
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        run: python scripts/build_data.py
+
+      - name: Commit & push if changed
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data; then
+            echo "No data changes."
+          else
+            git add data
+            git commit -m "Auto-update NCAAF data ($(TZ=America/New_York date '+%Y-%m-%d %H:%M ET'))"
+            git push
+          fi
