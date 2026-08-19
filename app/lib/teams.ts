@@ -25,11 +25,12 @@ export function logoUrl(abbr: string): string {
 }
 
 // ── conference short names / ordering ────────────────────────────────────────
+// Order matters: "Mid-American" must be tested before "American" (it contains it).
 const CONF_SHORT_KEYS: [string, string][] = [
   ["Southeastern", "SEC"], ["Big Ten", "Big Ten"], ["Big 12", "Big 12"],
-  ["Atlantic Coast", "ACC"], ["Pac-12", "Pac-12"], ["American", "American"],
-  ["Mountain West", "Mtn West"], ["Sun Belt", "Sun Belt"], ["Conference USA", "C-USA"],
-  ["Mid-American", "MAC"], ["Independent", "Independents"],
+  ["Atlantic Coast", "ACC"], ["Pac-12", "Pac-12"], ["Mid-American", "MAC"],
+  ["American", "American"], ["Mountain West", "Mtn West"], ["Sun Belt", "Sun Belt"],
+  ["Conference USA", "C-USA"], ["Independent", "Independents"],
 ];
 export function confShort(conf: string): string {
   for (const [key, short] of CONF_SHORT_KEYS) if (conf.toLowerCase().includes(key.toLowerCase())) return short;

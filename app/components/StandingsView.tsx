@@ -22,13 +22,24 @@ export default function StandingsView() {
   const [mode, setMode] = useState<Mode>("all");
   const [sortKey, setSortKey] = useState<SortKey>("elo");
   const [q, setQ] = useState("");
+  const [conf, setConf] = useState("all");
   const data = ELO[season];
   const steps = data.steps;
+
+  // conferences present this season, in canonical order (for the filter dropdown)
+  const confs = useMemo(() => {
+    const set = new Set(data.teams.map((t) => confShort(t.conf)));
+    return [...set].sort((a, b) => {
+      const ia = CONF_ORDER.indexOf(a), ib = CONF_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+  }, [data]);
 
   const sections = useMemo<Section[]>(() => {
     let teams = data.teams.slice();
     const query = q.trim().toLowerCase();
     if (query) teams = teams.filter((t) => t.name.toLowerCase().includes(query) || t.abbr.toLowerCase().includes(query));
+    if (conf !== "all") teams = teams.filter((t) => confShort(t.conf) === conf);
     const byElo = (a: EloTeam, b: EloTeam) => b.elo - a.elo;
 
     if (mode === "conf") {
@@ -70,7 +81,7 @@ export default function StandingsView() {
         : (t.odds[sortKey] ?? -1);
     const rows = teams.sort((a, b) => get(b) - get(a) || byElo(a, b));
     return [{ title: null, rows: rows.map((t, i) => ({ t, rank: String(i + 1) })) }];
-  }, [data, mode, sortKey, q]);
+  }, [data, mode, sortKey, q, conf]);
 
   const sortable = mode === "all";
   const th = (k: SortKey, label: string, extra = "") => (
@@ -94,6 +105,10 @@ export default function StandingsView() {
             </button>
           ))}
         </div>
+        <select className="ctl" value={conf} onChange={(e) => setConf(e.target.value)} aria-label="Filter by conference">
+          <option value="all">All conferences</option>
+          {confs.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
         <input className="ctl w-36" placeholder="Search team…" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="text-2xs text-s-muted ml-auto hidden md:block">
           {data.field_size}-team CFP · odds are a Monte-Carlo of committee selection + the bracket.

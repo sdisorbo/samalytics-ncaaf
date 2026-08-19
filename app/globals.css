@@ -23,17 +23,17 @@
 }
 
 :root[data-theme="dark"] {
-  --color-bg:       #170018;   /* near-black plum */
-  --color-surface:  #250021;   /* deep plum (from #420039) */
-  --color-border:   #421138;
-  --color-text:     #F3E7EF;
-  --color-muted:    #AC8FA4;
-  --color-accent:   #C95C97;   /* brighter berry pops on dark plum */
-  --color-hover:    #300029;
+  --color-bg:       #0E0B10;   /* near-black, faint plum */
+  --color-surface:  #16121A;   /* dark neutral charcoal (barely plum) */
+  --color-border:   #47163F;   /* plum border — the purple accent, kept vivid */
+  --color-text:     #F1E9F0;
+  --color-muted:    #9C90A2;
+  --color-accent:   #C95C97;   /* berry pops on the dark surface (nav / toggles) */
+  --color-hover:    #201A24;   /* subtle neutral hover, not saturated */
 
-  --heat-green:     #C95C97;   /* positive / high pole (bright berry) */
-  --heat-lav:       #C9A7BC;   /* mid */
-  --heat-purple:    #C08A5E;   /* negative / low pole (bright copper) */
+  --heat-green:     #AE4F82;   /* positive / high pole (muted berry, calmer fills) */
+  --heat-lav:       #B79AAC;   /* mid */
+  --heat-purple:    #B5875C;   /* negative / low pole (copper) */
 }
 
 * { box-sizing: border-box; }
