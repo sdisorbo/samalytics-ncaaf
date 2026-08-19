@@ -32,7 +32,7 @@ import numpy as np
 import cfbd
 
 ROOT = Path(__file__).resolve().parent.parent
-OUTCOMES = ROOT.parent / "sentiment_backtest" / "outcomes.csv"
+VEGAS_HISTORY = Path(__file__).resolve().parent / "vegas_history.csv"  # vendored, 2018-2025
 OUT = ROOT / "data"
 
 # 2020 was COVID-shortened (≈10 games, distorted totals) -> excluded everywhere.
@@ -184,24 +184,17 @@ DISPLAY_YEARS = [2021, 2022, 2023, 2024, 2025, 2026]
 
 
 def load_vegas():
-    """Vegas win totals: outcomes.csv (2018-24) + live SBD scrape (2025-26)."""
+    """Vegas win totals -> {(year, normname): win_total}. Static history file
+    (2018-2025) plus a live scrape of SBD's current page for the upcoming year."""
     vegas = {}
-    with open(OUTCOMES) as f:
-        for r in csv.DictReader(f):
-            try:
-                vegas[(int(r["year"]), vnorm(r["team"]))] = (float(r["win_total"]), int(r["actual_wins"]))
-            except Exception:
-                pass
-    try:
-        import sys
-        sys.path.insert(0, str(ROOT.parent / "sentiment_backtest"))
-        from outcomes_fetcher import fetch_sbd_lines
-        for y, lines in fetch_sbd_lines([2023, 2024, 2025]).items():   # completed seasons
-            for team, wt, *_ in lines:
-                vegas.setdefault((y, vnorm(team)), (wt, None))
-    except Exception as e:
-        print(f"  (past-season SBD lines unavailable: {e})")
-    # the UPCOMING season's lines live on SBD's live page
+    if VEGAS_HISTORY.exists():
+        with open(VEGAS_HISTORY) as f:
+            for r in csv.DictReader(f):
+                try:
+                    vegas[(int(r["year"]), vnorm(r["team"]))] = float(r["win_total"])
+                except Exception:
+                    pass
+    # the UPCOMING season's lines live on SBD's current win-totals page (one table)
     try:
         import time as _t, urllib.request
         from bs4 import BeautifulSoup
@@ -214,7 +207,7 @@ def load_vegas():
             c = [x.get_text(strip=True) for x in tr.find_all(["td", "th"])]
             if len(c) >= 2:
                 try:
-                    vegas[(up, vnorm(c[0]))] = (float(c[1]), None)
+                    vegas[(up, vnorm(c[0]))] = float(c[1])
                 except ValueError:
                     pass
     except Exception as e:
@@ -237,16 +230,19 @@ def main():
         for r, p in zip(te, ridge_pred(m, te)):
             preds[(r["year"], r["team"])] = float(p)
     cv_err = [preds[(r["year"], r["team"])] - r["wins"] for r in rows]
-    print(f"\nMODEL (leave-one-season-out):  RMSE={rmse(cv_err):.3f}  MAE={mae(cv_err):.3f}")
+    w1 = 100 * sum(abs(e) <= 1 for e in cv_err) / len(cv_err)
+    w2 = 100 * sum(abs(e) <= 2 for e in cv_err) / len(cv_err)
+    print(f"\nMODEL (leave-one-season-out):  RMSE={rmse(cv_err):.3f}  MAE={mae(cv_err):.3f}  "
+          f"within 1 win={w1:.0f}%  within 2={w2:.0f}%")
 
-    # Vegas benchmark on the overlap
+    # Vegas benchmark on the overlap (actual wins from CFBD records)
     vegas = load_vegas()
     m_err, v_err, hits, tot = [], [], 0, 0
     for r in rows:
-        v = vegas.get((r["year"], vnorm(r["team"])))
-        if not v:
+        wt = vegas.get((r["year"], vnorm(r["team"])))
+        if wt is None:
             continue
-        wt, actual = v
+        actual = r["wins"]
         pr = preds[(r["year"], r["team"])]
         m_err.append(pr - actual); v_err.append(wt - actual)
         if abs(pr - wt) >= 0.5 and actual != wt:
@@ -278,7 +274,7 @@ def main():
             teams.append({
                 "team": r["team"], "abbr": m["abbr"], "logo": m["logo"], "conf": m["conf"],
                 "proj": round(proj, 2),
-                "vegas": v[0] if v else None,
+                "vegas": v,
                 "actual": r["wins"] if r["wins"] is not None else None,
             })
         teams.sort(key=lambda t: -t["proj"])

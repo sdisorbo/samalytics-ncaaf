@@ -71,9 +71,17 @@ jobs:
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
         run: pip install -r scripts/requirements.txt
 
-      - name: Rebuild data
+      - name: Rebuild Elo / standings / playoff odds (ESPN)
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
         run: python scripts/build_data.py
+
+      - name: Rebuild win totals + actual playoff brackets (CFBD)
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        env:
+          CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
+        run: |
+          python scripts/build_wins.py || echo "build_wins failed — keeping existing wins.json"
+          python scripts/build_playoffs.py || echo "build_playoffs failed — keeping existing playoffs.json"
 
       - name: Commit & push if changed
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'

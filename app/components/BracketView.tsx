@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { SEASONS, SEASON_LABEL, DEFAULT_SEASON, type Season } from "../lib/data";
 import { getField, buildGames, simulate, applyPick, clearPick, type SlotView, type GameView } from "../lib/bracket";
+import { hasActual } from "../lib/playoffs";
+import ActualBracket from "./ActualBracket";
 
 const ROUND_TITLE: Record<string, string> = { R1: "First Round", QF: "Quarterfinals", SF: "Semifinals", F: "National Championship" };
 const ROUND_ORDER = ["R1", "QF", "SF", "F"];
@@ -16,7 +18,10 @@ function fmtPct(p: number): string {
 export default function BracketView() {
   const [season, setSeason] = useState<Season>(DEFAULT_SEASON);
   const [forced, setForced] = useState<Record<string, string>>({});
-  useEffect(() => { setForced({}); }, [season]);
+  const [view, setView] = useState<"actual" | "projected">(hasActual(DEFAULT_SEASON) ? "actual" : "projected");
+  const actualAvail = hasActual(season);
+  useEffect(() => { setForced({}); setView(hasActual(season) ? "actual" : "projected"); }, [season]);
+  const showActual = actualAvail && view === "actual";
 
   const { field, format } = useMemo(() => getField(season), [season]);
   const games = useMemo(() => buildGames(field, format), [field, format]);
@@ -62,15 +67,23 @@ export default function BracketView() {
         <select className="ctl" value={season} onChange={(e) => setSeason(e.target.value as Season)}>
           {SEASONS.map((s) => <option key={s} value={s}>{SEASON_LABEL[s]}</option>)}
         </select>
-        {Object.keys(forced).length > 0 && (
+        {actualAvail && (
+          <div className="segment">
+            <button className={view === "actual" ? "on" : ""} onClick={() => setView("actual")}>Results</button>
+            <button className={view === "projected" ? "on" : ""} onClick={() => setView("projected")}>Projected</button>
+          </div>
+        )}
+        {!showActual && Object.keys(forced).length > 0 && (
           <button className="pill on" onClick={() => setForced({})}>Reset picks</button>
         )}
         <span className="text-2xs text-s-muted ml-auto hidden md:block">
-          Faded = less likely to advance. Click any team to send it through — the rest update.
+          {showActual ? "Final bracket — winners in color, scores at right."
+            : "Faded = less likely to advance. Click any team to send it through — the rest update."}
         </span>
       </div>
 
       <div className="stat-card">
+        {showActual ? <ActualBracket season={season} /> : (
         <div className="brk-scroll">
           <div className="brk-row">
             {columns.map((col) => (
@@ -101,13 +114,16 @@ export default function BracketView() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       <p className="text-2xs text-s-muted mt-3 leading-relaxed max-w-3xl">
-        The bracket assumes the projected {format === "cfp12" ? "12" : "4"}-team field (see the Standings
-        page). Each percentage is a team&apos;s chance to win that game and advance, from a Monte-Carlo of the
-        bracket played off end-of-season Elo (first-round higher seeds host; later rounds are neutral). Pin a
-        team and its whole path locks in, so you can play out any what-if and watch the odds shift.
+        {showActual
+          ? "The actual College Football Playoff — real field, seeds, and scores. Switch to Projected to replay it as a what-if from end-of-season Elo."
+          : <>The bracket assumes the projected {format === "cfp12" ? "12" : "4"}-team field (see the Standings
+            page). Each percentage is a team&apos;s chance to win that game and advance, from a Monte-Carlo of the
+            bracket played off end-of-season Elo (first-round higher seeds host; later rounds are neutral). Pin a
+            team and its whole path locks in, so you can play out any what-if and watch the odds shift.</>}
       </p>
     </>
   );
