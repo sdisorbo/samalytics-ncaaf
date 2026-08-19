@@ -39,7 +39,15 @@ def get(path: str, ttl_days: float = 120.0, **params):
     if ck.exists() and (time.time() - ck.stat().st_mtime) < ttl_days * 86400:
         return json.loads(ck.read_text())
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=40) as r:
-        data = json.loads(r.read().decode())
-    ck.write_text(json.dumps(data))
-    return data
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(req, timeout=40) as r:
+                data = json.loads(r.read().decode())
+            ck.write_text(json.dumps(data))
+            time.sleep(0.4)  # be polite to the free tier
+            return data
+        except urllib.error.HTTPError as e:
+            if e.code == 429 and attempt < 5:      # rate limited -> back off
+                time.sleep(2.5 * (attempt + 1))
+                continue
+            raise
