@@ -33,3 +33,6 @@ __pycache__/
 
 # local ESPN fetch cache (CI fetches fresh)
 /scripts/.cache/
+
+# local secrets (CFBD key)
+.env
