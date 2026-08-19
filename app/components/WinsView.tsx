@@ -118,7 +118,8 @@ export default function WinsView() {
     let ts = teams.slice();
     if (conf !== "all") ts = ts.filter((t) => winConfShort(t.conf) === conf);
     const withV = ts.filter((t) => t.vegas != null);
-    if (mode === "proj") {
+    // no lines posted (or filtered away)? just show projections so it's never blank
+    if (mode === "proj" || withV.length === 0) {
       return [{ title: null as string | null, rows: ts.sort((a, b) => b.proj - a.proj) }];
     }
     const edge = (t: WinTeam) => t.proj - (t.vegas as number);

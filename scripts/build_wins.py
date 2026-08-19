@@ -194,25 +194,64 @@ def load_vegas():
                     vegas[(int(r["year"]), vnorm(r["team"]))] = float(r["win_total"])
                 except Exception:
                     pass
-    # the UPCOMING season's lines live on SBD's current win-totals page (one table)
-    try:
-        import time as _t, urllib.request
-        from bs4 import BeautifulSoup
-        up = _t.gmtime().tm_year
-        req = urllib.request.Request(
-            "https://www.sportsbettingdime.com/college-football/futures/win-totals-best-odds/",
-            headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(urllib.request.urlopen(req, timeout=25).read().decode(), "html.parser")
-        for tr in soup.find("table").find_all("tr")[1:]:
-            c = [x.get_text(strip=True) for x in tr.find_all(["td", "th"])]
-            if len(c) >= 2:
-                try:
-                    vegas[(up, vnorm(c[0]))] = float(c[1])
-                except ValueError:
-                    pass
-    except Exception as e:
-        print(f"  (upcoming-season Vegas lines unavailable: {e})")
+    # the UPCOMING season's lines live on SBD's current win-totals page (one table).
+    # Parsed with the stdlib (no bs4 dependency) so this can't silently drop the
+    # newest season if a package is missing.
+    import time as _t
+    up = _t.gmtime().tm_year
+    added = 0
+    for attempt in range(3):
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                "https://www.sportsbettingdime.com/college-football/futures/win-totals-best-odds/",
+                headers={"User-Agent": "Mozilla/5.0"})
+            html = urllib.request.urlopen(req, timeout=25).read().decode("utf-8", "ignore")
+            for team, wt in _parse_sbd_table(html):
+                vegas[(up, vnorm(team))] = wt
+                added += 1
+            break
+        except Exception as e:
+            if attempt == 2:
+                print(f"  (upcoming-season Vegas lines unavailable: {e})")
+            _t.sleep(2)
+    if added:
+        print(f"  upcoming-season ({up}) Vegas lines: {added}")
     return vegas
+
+
+def _parse_sbd_table(html):
+    """Extract (team, win_total) rows from SBD's win-totals table, stdlib only."""
+    from html.parser import HTMLParser
+
+    class T(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.rows, self.cur, self.incell, self.buf = [], None, False, ""
+        def handle_starttag(self, tag, attrs):
+            if tag == "tr":
+                self.cur = []
+            elif tag in ("td", "th") and self.cur is not None:
+                self.incell, self.buf = True, ""
+        def handle_endtag(self, tag):
+            if tag in ("td", "th") and self.incell:
+                self.cur.append(self.buf.strip()); self.incell = False
+            elif tag == "tr" and self.cur is not None:
+                self.rows.append(self.cur); self.cur = None
+        def handle_data(self, data):
+            if self.incell:
+                self.buf += data
+
+    p = T()
+    p.feed(html)
+    out = []
+    for c in p.rows:
+        if len(c) >= 2 and c[0]:
+            try:
+                out.append((c[0], float(c[1])))
+            except ValueError:
+                pass
+    return out
 
 
 def main():
