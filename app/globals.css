@@ -122,6 +122,34 @@ table, .tabular {
 
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+/* ── projected playoff bracket ───────────────────────────────────────────── */
+.brk-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+.brk-row { display: flex; gap: 14px; align-items: stretch; min-width: min-content; }
+.brk-col { min-width: 172px; display: flex; flex-direction: column; justify-content: space-around; gap: 12px; }
+.brk-col-title {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--color-muted); margin-bottom: 4px; text-align: center;
+}
+.brk-game { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; background: var(--color-surface); }
+.brk-slot {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px;
+  background: transparent; border: 0; text-align: left; cursor: pointer; color: var(--color-text);
+  transition: background 0.12s ease;
+}
+.brk-slot + .brk-slot { border-top: 1px solid var(--color-border); }
+.brk-slot:hover { background: var(--color-hover); }
+.brk-slot[data-forced="true"] { background: color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.brk-slot[data-win="true"] { box-shadow: inset 3px 0 0 var(--color-accent); }
+.brk-seed { font-size: 0.58rem; width: 15px; text-align: center; color: var(--color-muted); font-weight: 700; flex: none; }
+.brk-logo { width: 26px; height: 26px; object-fit: contain; flex: none; }
+.brk-abbr { font-weight: 700; font-size: 0.72rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brk-pct { font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-muted); flex: none; }
+.brk-slot[data-forced="true"] .brk-pct { color: var(--color-accent); }
+.brk-champ {
+  border: 1px solid var(--color-accent); border-radius: 12px; padding: 14px 12px; text-align: center;
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+
 /* recharts theming */
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   border: 1px solid var(--color-border) !important; border-radius: 10px !important;

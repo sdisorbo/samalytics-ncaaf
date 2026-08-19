@@ -6,6 +6,7 @@ import clsx from "clsx";
 
 const LINKS = [
   { href: "/", label: "Standings" },
+  { href: "/bracket", label: "Bracket" },
   { href: "/elo", label: "Elo Ratings" },
 ];
 
