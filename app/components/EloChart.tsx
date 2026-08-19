@@ -33,7 +33,7 @@ export default function EloChart({ season: ctrlSeason }: { season?: Season } = {
     const sm: Record<string, number[]> = {};
     for (const abbr of ordered) {
       const byDate = new Map((data.trend[abbr] ?? []).map((p) => [p.date, p.rating]));
-      let last = 1500; const arr: number[] = [];
+      let last = data.open?.[abbr] ?? 1500; const arr: number[] = [];
       for (const d of dates) { if (byDate.has(d)) last = byDate.get(d)!; arr.push(last); }
       sm[abbr] = smooth(arr);
     }

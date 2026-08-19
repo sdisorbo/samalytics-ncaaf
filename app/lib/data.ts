@@ -32,6 +32,7 @@ export type BandPoint = { date: string; min: number; max: number; avg: number };
 export type EloData = {
   season: string; format: string; field_size: number; steps: Step[];
   teams: EloTeam[]; conf_summary: ConfSummary[];
+  open: Record<string, number>; // each team's season-opening (carried) Elo
   trend: Record<string, TrendPoint[]>; band: BandPoint[];
 };
 

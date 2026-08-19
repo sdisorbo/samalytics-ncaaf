@@ -89,7 +89,8 @@ export default function BracketView() {
             <div className="brk-col" style={{ justifyContent: "center", minWidth: 150 }}>
               <div className="brk-col-title">Champion</div>
               <div className="brk-champ">
-                <div className="text-2xl mb-1">🏆</div>
+                <img src="/cfp_logo.png" alt="College Football Playoff" width={40} height={40}
+                  className="object-contain mx-auto mb-1.5" />
                 {champTeam?.logo ? (
                   <img src={champTeam.logo} alt={sim.champ.abbr} width={44} height={44}
                     className="object-contain mx-auto mb-1" />

@@ -385,9 +385,10 @@ def main():
     rng = np.random.default_rng(SEED)
     np.random.seed(SEED)
 
-    # discover which seasons actually have data
+    # discover which seasons actually have data (through next year, so a new
+    # season is auto-picked-up the moment ESPN has games for it)
     seasons = []
-    for yr in range(FIRST_SEASON, 2027):
+    for yr in range(FIRST_SEASON, time.gmtime().tm_year + 2):
         tm = load_season_teams(yr)
         if not tm:
             continue
@@ -410,6 +411,10 @@ def main():
         season_meta = load_season_teams(season)
         fbs = set(season_meta.keys())
         games = load_games(season)
+
+        # each team's season-opening rating (carried + regressed from last year),
+        # so the Elo chart starts every team staggered instead of flat at 1500
+        open_elo = {a: round(elo[a], 1) for a in fbs}
 
         rec = {a: {"w": 0, "l": 0, "pf": 0, "pa": 0} for a in fbs}
         conf_rec = {a: {"w": 0, "l": 0} for a in fbs}
@@ -504,7 +509,8 @@ def main():
         teams_out.sort(key=lambda t: -t["elo"])
 
         # band: min/max/avg of carried-forward ratings over the date scaffold
-        carry = {key_of[a]: BASE for a in fbs}
+        # (start from each team's opening rating so the envelope is staggered too)
+        carry = {key_of[a]: open_elo[a] for a in fbs}
         trend_by_key = {key_of[a]: trend[a] for a in fbs}
         idx = {k: 0 for k in carry}
         band = []
@@ -543,6 +549,7 @@ def main():
             "steps": steps,
             "teams": teams_out,
             "conf_summary": conf_summary,
+            "open": {key_of[a]: open_elo[a] for a in fbs},
             "trend": trend_by_key,
             "band": band,
         }
