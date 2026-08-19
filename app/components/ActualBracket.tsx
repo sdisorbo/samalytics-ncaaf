@@ -42,7 +42,7 @@ export default function ActualBracket({ season }: { season: string }) {
             {data.champion?.logo ? (
               <img src={data.champion.logo} alt={data.champion.abbr} width={44} height={44} className="object-contain mx-auto mb-1" />
             ) : null}
-            <div className="font-black text-sm leading-tight">{data.champion?.team ?? "—"}</div>
+            <div className="font-black text-sm leading-tight">{data.champion?.team ?? "-"}</div>
             <div className="text-2xs text-s-muted mt-1">National Champion</div>
           </div>
         </div>

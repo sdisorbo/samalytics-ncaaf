@@ -36,7 +36,7 @@ VEGAS_HISTORY = Path(__file__).resolve().parent / "vegas_history.csv"  # vendore
 OUT = ROOT / "data"
 
 # 2020 was COVID-shortened (≈10 games, distorted totals) -> excluded everywhere.
-TRAIN_YEARS = [2018, 2019, 2021, 2022, 2023, 2024]
+TRAIN_YEARS = [2015, 2016, 2017, 2018, 2019, 2021, 2022, 2023, 2024]  # 2020 out (COVID)
 FEATURES = ["prev_wins", "prev_sp", "prev_elo", "talent", "recruiting", "ret_prod", "transfer", "sos"]
 RIDGE_LAMBDA = 5.0
 SEED = 17
@@ -357,7 +357,7 @@ def main():
     # ── metrics block for the site (accuracy table + accuracy-by-edge chart) ──
     def wpct(errs, k):
         return round(100 * sum(abs(e) <= k for e in errs) / len(errs))
-    edge_defs = [(0.5, 1, "0.5–1"), (1, 1.5, "1–1.5"), (1.5, 2, "1.5–2"), (2, 99, "2+")]
+    edge_defs = [(0.5, 1, "0.5-1"), (1, 1.5, "1-1.5"), (1.5, 2, "1.5-2"), (2, 99, "2+")]
     edge_bins = []
     for lo, hi, label in edge_defs:
         b = [c for e, c in leans if lo <= e < hi]
@@ -377,7 +377,7 @@ def main():
         "edge_bins": edge_bins,
         "features": [{"name": labels[f], "w": round(w / maxw, 3), "dir": s,
                       "val": f"{round(100 * w)}%"} for f, w, s in fw],
-        "seasons": f"{min(TRAIN_YEARS)}–{max(TRAIN_YEARS)}",
+        "seasons": f"{min(TRAIN_YEARS)}-{max(TRAIN_YEARS)}",
     }
 
     # ── per-season projections for the site (out-of-sample) ─────────────────

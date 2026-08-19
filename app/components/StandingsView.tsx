@@ -10,7 +10,7 @@ type Row = { t: EloTeam; rank: string };
 type Section = { title: string | null; rows: Row[]; cutAfter?: number; cutLabel?: string };
 
 function oddsCell(x: number | undefined, made: boolean) {
-  if (!made || x == null || x <= 0) return <span className="text-s-muted">—</span>;
+  if (!made || x == null || x <= 0) return <span className="text-s-muted">-</span>;
   const p = x * 100;
   const label = x >= 0.9995 ? "100%" : p < 1 ? "<1%" : `${p.toFixed(0)}%`;
   const { bg, fg } = oddsHeat(x);
@@ -71,7 +71,7 @@ export default function StandingsView() {
           cutAfter: 4, cutLabel: "First Round",
         }];
       }
-      return [{ title: `${data.field_size}-Team Playoff — Semifinals`, rows: field.map((t) => ({ t, rank: String(t.seed) })) }];
+      return [{ title: `${data.field_size}-Team Playoff: Semifinals`, rows: field.map((t) => ({ t, rank: String(t.seed) })) }];
     }
 
     // all / league
@@ -180,7 +180,7 @@ export default function StandingsView() {
       {mode === "playoff" && (
         <p className="text-2xs text-s-muted mt-3 leading-relaxed max-w-3xl">
           {data.format === "cfp12"
-            ? "Field of 12: the five highest-ranked conference champions earn automatic bids; the rest are the best at-large teams. Seeds 1–4 (•) get first-round byes."
+            ? "Field of 12: the five highest-ranked conference champions earn automatic bids; the rest are the best at-large teams. Seeds 1-4 (•) get first-round byes."
             : "Field of 4: the committee's top four by the selection model (Elo + conference strength + résumé)."}
         </p>
       )}

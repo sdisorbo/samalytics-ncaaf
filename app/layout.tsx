@@ -8,7 +8,7 @@ const orbitron = Orbitron({ subsets: ["latin"], variable: "--font-orbitron", wei
 
 export const metadata: Metadata = {
   title: "Samalytics | NCAAF Engine",
-  description: "Team Elo ratings, standings, and Monte-Carlo College Football Playoff odds for FBS — a sister to the Samalytics NHL, MLB & NFL engines.",
+  description: "Team Elo ratings, standings, and Monte-Carlo College Football Playoff odds for FBS. A sister to the Samalytics NHL, MLB & NFL engines.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Nav />
         <main className="max-w-screen-xl mx-auto px-3 sm:px-4 py-5 sm:py-7 overflow-x-hidden">{children}</main>
         <footer className="max-w-screen-xl mx-auto px-4 pb-10 pt-2 text-2xs text-s-muted leading-relaxed">
-          Samalytics NCAAF Engine — team Elo from FBS game results (margin-of-victory adjusted, home-field
+          Samalytics NCAAF Engine: team Elo from FBS game results (margin-of-victory adjusted, home-field
           bump), every team opening 2021 at 1500 and regressing 30% toward the mean each offseason. Ratings
           run through the end of the regular season, the rating each team carries into the College Football
           Playoff. Playoff odds are a Monte-Carlo of a committee-style selection model (Elo + conference

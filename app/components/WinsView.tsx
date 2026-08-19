@@ -19,7 +19,7 @@ function ModelPanel() {
         <p className="text-2xs text-s-muted leading-relaxed max-w-3xl">
           Our model is {m.model_label}, trained on {m.n_train} team-seasons ({m.seasons}), predicting a
           team&apos;s regular-season wins from eight inputs knowable before kickoff. It&apos;s scored
-          leave-one-season-out, so the numbers below are genuinely out-of-sample — the model never saw the
+          leave-one-season-out, so the numbers below are genuinely out-of-sample: the model never saw the
           season it&apos;s graded on. Bars are each input&apos;s share of the model&apos;s predictive power
           (green points toward more wins, copper toward fewer):
         </p>
@@ -48,7 +48,7 @@ function ModelPanel() {
               </tbody>
             </table>
             <p className="text-2xs text-s-muted mt-2 leading-relaxed">
-              Essentially even with the market on raw error — and when the model does lean off the number, it
+              Essentially even with the market on raw error, and when the model does lean off the number, it
               hits the over/under <span className="font-bold" style={{ color: "var(--heat-green)" }}>{m.ou.pct}%</span> of
               the time ({m.ou.hits}/{m.ou.total}), past the ~52.4% break-even.
             </p>
@@ -66,7 +66,7 @@ function ModelPanel() {
                 </div>
               ))}
             </div>
-            <p className="text-2xs text-s-muted mt-1 leading-relaxed">Bars above the dashed 50% line beat a coin flip; x-axis is |model − Vegas| in wins.</p>
+            <p className="text-2xs text-s-muted mt-1 leading-relaxed">Bars above the dashed 50% line beat a coin flip; x-axis is the model&apos;s gap from the Vegas line, in wins.</p>
           </div>
         </div>
       </div>
@@ -96,6 +96,51 @@ function Row({ t, rank }: { t: WinTeam; rank: number }) {
       <div className={`win-edge ${edge == null ? "" : edge >= 0 ? "over" : "under"}`}>
         {edge == null ? t.proj.toFixed(1) : `${edge >= 0 ? "+" : ""}${edge.toFixed(1)}`}
       </div>
+    </div>
+  );
+}
+
+// two worked examples above the table so the chart reads at a glance
+function ExampleRow({ kind }: { kind: "over" | "under" }) {
+  const over = kind === "over";
+  const vegas = over ? 6.5 : 7.5;
+  const proj = over ? 8.5 : 5.5;
+  const lo = Math.min(vegas, proj), hi = Math.max(vegas, proj);
+  const color = over ? "var(--wl-green)" : "var(--wl-red)";
+  return (
+    <>
+      <div className="wl-row">
+        <div className={`wl-pill ${kind}`}>{over ? "Over" : "Under"}</div>
+        <div className="wl-track">
+          {[2, 4, 6, 8, 10, 12].map((g) => <span key={g} className="win-grid" style={{ left: pos(g) }} />)}
+          <div className="win-vegas" style={{ left: pos(vegas) }} />
+          <span className="wl-tag bot" style={{ left: pos(vegas) }}>Vegas line ({vegas})</span>
+          <div className={`wl-arrow ${over ? "right" : "left"}`}
+            style={{ color, left: pos(lo), width: `${((hi - lo) / SCALE) * 100}%` }} />
+          <div className="wl-dot" style={{ left: pos(proj), background: color }} />
+          <span className="wl-tag top" style={{ left: pos(proj) }}>Our projection ({proj})</span>
+        </div>
+        <div className={`wl-edge ${kind}`}>{over ? "+" : ""}{(proj - vegas).toFixed(1)}</div>
+      </div>
+      <div className="wl-desc">
+        {over ? (
+          <>The projection sits to the <b className="over">right</b> of the Vegas line, so the model projects
+            more wins than the market: a <b className="over">green Over</b> lean.</>
+        ) : (
+          <>The projection sits to the <b className="under">left</b> of the Vegas line, so the model projects
+            fewer wins than the market: a <b className="under">red Under</b> lean.</>
+        )}
+      </div>
+    </>
+  );
+}
+
+function WinLegend() {
+  return (
+    <div className="win-legend">
+      <div className="wl-head">How to read it</div>
+      <ExampleRow kind="over" />
+      <ExampleRow kind="under" />
     </div>
   );
 }
@@ -158,6 +203,8 @@ export default function WinsView() {
           {started && <span className="inline-flex items-center gap-1"><span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-text)", display: "inline-block" }} />actual</span>}
         </span>
       </div>
+
+      <WinLegend />
 
       <div className="stat-card">
         <div className="win-axis">

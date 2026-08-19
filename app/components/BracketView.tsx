@@ -10,7 +10,7 @@ const ROUND_ORDER = ["R1", "QF", "SF", "F"];
 
 function fmtPct(p: number): string {
   if (p >= 0.9995) return "100%";
-  if (p <= 0) return "—";
+  if (p <= 0) return "-";
   if (p < 0.01) return "<1%";
   return `${Math.round(p * 100)}%`;
 }
@@ -77,8 +77,8 @@ export default function BracketView() {
           <button className="pill on" onClick={() => setForced({})}>Reset picks</button>
         )}
         <span className="text-2xs text-s-muted ml-auto hidden md:block">
-          {showActual ? "Final bracket — winners in color, scores at right."
-            : "Faded = less likely to advance. Click any team to send it through — the rest update."}
+          {showActual ? "Final bracket. Winners in color, scores at right."
+            : "Faded = less likely to advance. Click any team to send it through, and the rest update."}
         </span>
       </div>
 
@@ -108,7 +108,7 @@ export default function BracketView() {
                   <img src={champTeam.logo} alt={sim.champ.abbr} width={44} height={44}
                     className="object-contain mx-auto mb-1" />
                 ) : null}
-                <div className="font-black text-sm leading-tight">{champTeam?.name ?? "—"}</div>
+                <div className="font-black text-sm leading-tight">{champTeam?.name ?? "-"}</div>
                 <div className="text-2xs text-s-muted mt-1">{fmtPct(sim.champ.p)} to win it all</div>
               </div>
             </div>
@@ -119,7 +119,7 @@ export default function BracketView() {
 
       <p className="text-2xs text-s-muted mt-3 leading-relaxed max-w-3xl">
         {showActual
-          ? "The actual College Football Playoff — real field, seeds, and scores. Switch to Projected to replay it as a what-if from end-of-season Elo."
+          ? "The actual College Football Playoff: real field, seeds, and scores. Switch to Projected to replay it as a what-if from end-of-season Elo."
           : <>The bracket assumes the projected {format === "cfp12" ? "12" : "4"}-team field (see the Standings
             page). Each percentage is a team&apos;s chance to win that game and advance, from a Monte-Carlo of the
             bracket played off end-of-season Elo (first-round higher seeds host; later rounds are neutral). Pin a

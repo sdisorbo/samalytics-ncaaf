@@ -27,6 +27,6 @@ const CONF_SHORT: Record<string, string> = {
   "Mountain West": "Mtn West", "FBS Independents": "Independents",
 };
 export function winConfShort(conf: string | null): string {
-  return conf ? (CONF_SHORT[conf] ?? conf) : "—";
+  return conf ? (CONF_SHORT[conf] ?? conf) : "-";
 }
 export const WIN_CONF_ORDER = ["SEC", "Big Ten", "Big 12", "ACC", "Pac-12", "American", "Mtn West", "Sun Belt", "C-USA", "MAC", "Independents"];
