@@ -150,6 +150,35 @@ table, .tabular {
   background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
 }
 
+/* ── win-total lollipop rows ─────────────────────────────────────────────── */
+.win-row { display: flex; align-items: center; gap: 8px; height: 34px; }
+.win-label { width: 62px; flex: none; display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 0.72rem; }
+.win-label .r { width: 16px; text-align: right; color: var(--color-muted); font-weight: 600; font-size: 0.62rem; }
+.win-track { position: relative; flex: 1; height: 100%; }
+.win-grid { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--color-border); opacity: 0.5; }
+.win-bar { position: absolute; top: 50%; height: 6px; transform: translateY(-50%); border-radius: 3px; }
+.win-bar.over  { background: var(--heat-green); }   /* model above Vegas (berry) */
+.win-bar.under { background: var(--heat-purple); }  /* model below Vegas (copper) */
+.win-vegas { position: absolute; top: 6px; bottom: 6px; width: 2px; background: var(--color-muted); border-radius: 1px; }
+.win-vegas::after {
+  content: attr(data-v); position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  font-size: 0.55rem; color: var(--color-muted); font-weight: 700; white-space: nowrap;
+}
+.win-actual { position: absolute; top: 50%; width: 11px; height: 11px; transform: translate(-50%, -50%);
+  border-radius: 50%; background: var(--color-text); border: 2px solid var(--color-surface); }
+.win-logo { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 26px; height: 26px;
+  object-fit: contain; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25)); }
+.win-proj { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 0.6rem; font-weight: 800;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6); pointer-events: none; }
+.win-edge { width: 52px; flex: none; text-align: right; font-size: 0.68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.win-edge.over { color: var(--heat-green); }
+.win-edge.under { color: var(--heat-purple); }
+.win-split { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; font-size: 0.6rem;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-muted); }
+.win-split::after { content: ""; flex: 1; height: 1px; background: var(--color-border); }
+.win-axis { position: relative; height: 16px; margin-left: 70px; margin-right: 52px; }
+.win-axis span { position: absolute; transform: translateX(-50%); font-size: 0.55rem; color: var(--color-muted); }
+
 /* recharts theming */
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   border: 1px solid var(--color-border) !important; border-radius: 10px !important;
