@@ -407,9 +407,21 @@ def main():
         top = ", ".join("{} {:.1f}".format(t["abbr"], t["proj"]) for t in teams[:4])
         print(f"  {y}: {len(teams)} teams, {nvegas} w/ Vegas line, top: {top}")
 
+    # keep any prior season we failed to rebuild this run (transient CFBD outage),
+    # so a season already on the site is never dropped
+    if (OUT / "wins.json").exists():
+        try:
+            prev = json.loads((OUT / "wins.json").read_text()).get("by_season", {})
+            for y in DISPLAY_YEARS:
+                if y not in have and str(y) in prev:
+                    out_seasons[str(y)] = prev[str(y)]; have.add(y)
+                    print(f"  {y}: build empty — keeping existing projections")
+        except Exception:
+            pass
+
     OUT.mkdir(exist_ok=True)
-    payload = {"seasons": [str(y) for y in DISPLAY_YEARS if y in have],
-               "latest": str(max(have)), "metrics": metrics, "by_season": out_seasons}
+    order = [str(y) for y in DISPLAY_YEARS if y in have]
+    payload = {"seasons": order, "latest": order[-1], "metrics": metrics, "by_season": out_seasons}
     (OUT / "wins.json").write_text(json.dumps(payload, separators=(",", ":")))
     print(f"\nwrote {OUT}/wins.json")
 

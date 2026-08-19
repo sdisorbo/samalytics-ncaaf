@@ -104,6 +104,7 @@ export default function WinsView() {
   const [season, setSeason] = useState<string>(WIN_LATEST);
   const [mode, setMode] = useState<Mode>("edge");
   const [conf, setConf] = useState("all");
+  const [q, setQ] = useState("");
   const teams = WINS[season] ?? [];
   const started = teams.some((t) => t.actual != null);
 
@@ -118,6 +119,8 @@ export default function WinsView() {
   const groups = useMemo(() => {
     let ts = teams.slice();
     if (conf !== "all") ts = ts.filter((t) => winConfShort(t.conf) === conf);
+    const query = q.trim().toLowerCase();
+    if (query) ts = ts.filter((t) => t.team.toLowerCase().includes(query) || t.abbr.toLowerCase().includes(query));
     const withV = ts.filter((t) => t.vegas != null);
     // no lines posted (or filtered away)? just show projections so it's never blank
     if (mode === "proj" || withV.length === 0) {
@@ -130,7 +133,7 @@ export default function WinsView() {
       { title: "Model over Vegas", rows: over },
       { title: "Model under Vegas", rows: under },
     ];
-  }, [teams, mode, conf]);
+  }, [teams, mode, conf, q]);
 
   return (
     <>
@@ -148,6 +151,7 @@ export default function WinsView() {
           <option value="all">All conferences</option>
           {confs.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
+        <input className="ctl w-36" placeholder="Search team…" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="text-2xs text-s-muted ml-auto hidden lg:flex items-center gap-3">
           <span className="inline-flex items-center gap-1"><span style={{ width: 2, height: 12, background: "var(--color-muted)", display: "inline-block" }} />Vegas</span>
           <span className="inline-flex items-center gap-1"><span style={{ width: 14, height: 6, borderRadius: 3, background: "var(--heat-green)", display: "inline-block" }} />projection</span>

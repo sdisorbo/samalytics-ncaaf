@@ -147,13 +147,22 @@ def build_season(year):
 
 def main():
     import time
+    # start from the committed file so a transient CFBD failure for one season
+    # can never DROP a bracket we already have — we only ever overwrite on success
     out = {}
+    if (OUT / "playoffs.json").exists():
+        try:
+            out = json.loads((OUT / "playoffs.json").read_text())
+        except Exception:
+            out = {}
     for y in range(FIRST, time.gmtime().tm_year + 1):
         s = build_season(y)
         if s:
             out[str(y)] = s
             n = sum(len(v) for v in s["rounds"].values())
             print(f"  {y} [{s['format']}]: {n} games, champion {s['champion']['abbr'] if s['champion'] else '—'}")
+        elif str(y) in out:
+            print(f"  {y}: build failed — keeping existing bracket")
     OUT.mkdir(exist_ok=True)
     (OUT / "playoffs.json").write_text(json.dumps(out, separators=(",", ":")))
     print(f"wrote {OUT}/playoffs.json ({len(out)} seasons)")
