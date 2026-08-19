@@ -238,6 +238,7 @@ def main():
     # Vegas benchmark on the overlap (actual wins from CFBD records)
     vegas = load_vegas()
     m_err, v_err, hits, tot = [], [], 0, 0
+    leans = []   # (edge_magnitude, model_lean_correct) for the accuracy-by-edge chart
     for r in rows:
         wt = vegas.get((r["year"], vnorm(r["team"])))
         if wt is None:
@@ -245,8 +246,11 @@ def main():
         actual = r["wins"]
         pr = preds[(r["year"], r["team"])]
         m_err.append(pr - actual); v_err.append(wt - actual)
-        if abs(pr - wt) >= 0.5 and actual != wt:
-            tot += 1; hits += (pr > wt) == (actual > wt)
+        if pr != wt and actual != wt:
+            correct = (pr > wt) == (actual > wt)
+            leans.append((abs(pr - wt), correct))
+            if abs(pr - wt) >= 0.5:
+                tot += 1; hits += correct
     print(f"\nOn {len(m_err)} team-seasons that also have a Vegas line:")
     print(f"  Model RMSE={rmse(m_err):.3f}   Vegas RMSE={rmse(v_err):.3f}")
     print(f"  Model beats Vegas O/U (|edge|>=0.5): {hits}/{tot} = {100*hits/max(tot,1):.1f}%")
@@ -256,6 +260,31 @@ def main():
     print("\nStandardized coefficients (wins per 1 SD):")
     for f, w in sorted(zip(FEATURES, full["w"]), key=lambda kv: -abs(kv[1])):
         print(f"  {f:11s} {w:+.3f}")
+
+    # ── metrics block for the site (accuracy table + accuracy-by-edge chart) ──
+    def wpct(errs, k):
+        return round(100 * sum(abs(e) <= k for e in errs) / len(errs))
+    edge_defs = [(0.5, 1, "0.5–1"), (1, 1.5, "1–1.5"), (1.5, 2, "1.5–2"), (2, 99, "2+")]
+    edge_bins = []
+    for lo, hi, label in edge_defs:
+        b = [c for e, c in leans if lo <= e < hi]
+        if b:
+            edge_bins.append({"label": label, "n": len(b), "hit_pct": round(100 * sum(b) / len(b))})
+    labels = {"prev_elo": "Prior-year Elo", "prev_sp": "Prior-year SP+", "prev_wins": "Prior-year wins",
+              "talent": "Roster talent (247)", "recruiting": "Recruiting class", "ret_prod": "Returning production",
+              "transfer": "Transfer-portal haul", "sos": "Strength of schedule"}
+    metrics = {
+        "n_train": len(rows), "overlap_n": len(m_err),
+        "model": {"rmse": round(rmse(m_err), 2), "mae": round(mae(m_err), 2),
+                  "w1": wpct(m_err, 1), "w2": wpct(m_err, 2)},
+        "vegas": {"rmse": round(rmse(v_err), 2), "mae": round(mae(v_err), 2),
+                  "w1": wpct(v_err, 1), "w2": wpct(v_err, 2)},
+        "ou": {"hits": hits, "total": tot, "pct": round(100 * hits / max(tot, 1), 1)},
+        "edge_bins": edge_bins,
+        "features": [{"name": labels[f], "coef": round(float(w), 2)}
+                     for f, w in sorted(zip(FEATURES, full["w"]), key=lambda kv: -abs(kv[1]))],
+        "seasons": f"{min(TRAIN_YEARS)}–{max(TRAIN_YEARS)}",
+    }
 
     # ── per-season projections for the site (out-of-sample) ─────────────────
     out_seasons = {}
@@ -286,7 +315,7 @@ def main():
 
     OUT.mkdir(exist_ok=True)
     payload = {"seasons": [str(y) for y in DISPLAY_YEARS if y in have],
-               "latest": str(max(have)), "by_season": out_seasons}
+               "latest": str(max(have)), "metrics": metrics, "by_season": out_seasons}
     (OUT / "wins.json").write_text(json.dumps(payload, separators=(",", ":")))
     print(f"\nwrote {OUT}/wins.json")
 

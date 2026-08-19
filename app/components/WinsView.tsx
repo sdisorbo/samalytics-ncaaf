@@ -1,11 +1,77 @@
 "use client";
 import { Fragment, useMemo, useState } from "react";
-import { WINS, WIN_SEASONS, WIN_LATEST, type WinTeam } from "../lib/wins";
+import { WINS, WIN_SEASONS, WIN_LATEST, WIN_METRICS, winConfShort, WIN_CONF_ORDER, type WinTeam } from "../lib/wins";
 
 const SCALE = 13; // wins axis 0..13
 const pos = (w: number) => `${Math.max(0, Math.min(1, w / SCALE)) * 100}%`;
 
 type Mode = "edge" | "proj";
+
+function ModelPanel() {
+  const m = WIN_METRICS;
+  const maxCoef = Math.max(...m.features.map((f) => Math.abs(f.coef)));
+  const EY0 = 45, EY1 = 60; // edge-chart y-range (%)
+  const h = (v: number) => `${((Math.max(EY0, Math.min(EY1, v)) - EY0) / (EY1 - EY0)) * 100}%`;
+  return (
+    <details className="model-panel">
+      <summary>How the model works &amp; how accurate it is</summary>
+      <div className="body">
+        <p className="text-2xs text-s-muted leading-relaxed max-w-3xl">
+          A ridge regression trained on {m.n_train} team-seasons ({m.seasons}) that predicts a team&apos;s
+          regular-season wins from eight inputs knowable before kickoff. It&apos;s scored
+          leave-one-season-out, so the numbers below are genuinely out-of-sample — the model never saw the
+          season it&apos;s graded on. Weights are in wins per standard deviation (green helps, copper hurts):
+        </p>
+
+        <div className="feat-bars">
+          {m.features.map((f) => (
+            <Fragment key={f.name}>
+              <span className="fn">{f.name}</span>
+              <span className="ft" style={{
+                width: `${(Math.abs(f.coef) / maxCoef) * 100}%`,
+                background: f.coef >= 0 ? "var(--heat-green)" : "var(--heat-purple)",
+              }} />
+              <span className="fv">{f.coef >= 0 ? "+" : ""}{f.coef.toFixed(2)}</span>
+            </Fragment>
+          ))}
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-5 mt-3">
+          <div>
+            <div className="section-heading">Accuracy vs. Vegas ({m.overlap_n} team-seasons with a posted total)</div>
+            <table className="metric-table">
+              <thead><tr><th></th><th>RMSE</th><th>MAE</th><th>±1 win</th><th>±2 wins</th></tr></thead>
+              <tbody>
+                <tr><td>Our model</td><td>{m.model.rmse}</td><td>{m.model.mae}</td><td>{m.model.w1}%</td><td>{m.model.w2}%</td></tr>
+                <tr><td>Vegas line</td><td>{m.vegas.rmse}</td><td>{m.vegas.mae}</td><td>{m.vegas.w1}%</td><td>{m.vegas.w2}%</td></tr>
+              </tbody>
+            </table>
+            <p className="text-2xs text-s-muted mt-2 leading-relaxed">
+              Essentially even with the market on raw error — and when the model does lean off the number, it
+              hits the over/under <span className="font-bold" style={{ color: "var(--heat-green)" }}>{m.ou.pct}%</span> of
+              the time ({m.ou.hits}/{m.ou.total}), past the ~52.4% break-even.
+            </p>
+          </div>
+
+          <div>
+            <div className="section-heading">Over/under hit rate by size of disagreement</div>
+            <div className="edge-chart">
+              <div className="edge-base" style={{ bottom: h(50) }} />
+              {m.edge_bins.map((b) => (
+                <div key={b.label} className="col">
+                  <span className="bl">{b.hit_pct}%</span>
+                  <div className="bar" style={{ height: h(b.hit_pct) }} />
+                  <span className="cap">{b.label}<br />n={b.n}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-2xs text-s-muted mt-1 leading-relaxed">Bars above the dashed 50% line beat a coin flip; x-axis is |model − Vegas| in wins.</p>
+          </div>
+        </div>
+      </div>
+    </details>
+  );
+}
 
 function Row({ t, rank }: { t: WinTeam; rank: number }) {
   const v = t.vegas;
@@ -36,34 +102,51 @@ function Row({ t, rank }: { t: WinTeam; rank: number }) {
 export default function WinsView() {
   const [season, setSeason] = useState<string>(WIN_LATEST);
   const [mode, setMode] = useState<Mode>("edge");
+  const [conf, setConf] = useState("all");
   const teams = WINS[season] ?? [];
   const started = teams.some((t) => t.actual != null);
 
+  const confs = useMemo(() => {
+    const set = new Set(teams.map((t) => winConfShort(t.conf)));
+    return [...set].sort((a, b) => {
+      const ia = WIN_CONF_ORDER.indexOf(a), ib = WIN_CONF_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+  }, [teams]);
+
   const groups = useMemo(() => {
-    const withV = teams.filter((t) => t.vegas != null);
+    let ts = teams.slice();
+    if (conf !== "all") ts = ts.filter((t) => winConfShort(t.conf) === conf);
+    const withV = ts.filter((t) => t.vegas != null);
     if (mode === "proj") {
-      const rows = teams.slice().sort((a, b) => b.proj - a.proj);
-      return [{ title: null as string | null, rows }];
+      return [{ title: null as string | null, rows: ts.sort((a, b) => b.proj - a.proj) }];
     }
-    const over = withV.filter((t) => t.proj >= (t.vegas as number)).sort((a, b) => (b.proj - (b.vegas as number)) - (a.proj - (a.vegas as number)));
-    const under = withV.filter((t) => t.proj < (t.vegas as number)).sort((a, b) => (b.proj - (b.vegas as number)) - (a.proj - (a.vegas as number)));
+    const edge = (t: WinTeam) => t.proj - (t.vegas as number);
+    const over = withV.filter((t) => t.proj >= (t.vegas as number)).sort((a, b) => edge(b) - edge(a));
+    const under = withV.filter((t) => t.proj < (t.vegas as number)).sort((a, b) => edge(b) - edge(a));
     return [
       { title: "Model over Vegas", rows: over },
       { title: "Model under Vegas", rows: under },
     ];
-  }, [teams, mode]);
+  }, [teams, mode, conf]);
 
   return (
     <>
+      <ModelPanel />
+
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <select className="ctl" value={season} onChange={(e) => setSeason(e.target.value)}>
           {WIN_SEASONS.map((s) => <option key={s} value={s}>{s}{s === WIN_LATEST && !started ? " (preseason)" : ""}</option>)}
         </select>
         <div className="segment">
           <button className={mode === "edge" ? "on" : ""} onClick={() => setMode("edge")}>vs Vegas</button>
-          <button className={mode === "proj" ? "on" : ""} onClick={() => setMode("proj")}>By projection</button>
+          <button className={mode === "proj" ? "on" : ""} onClick={() => setMode("proj")}>By win total</button>
         </div>
-        <span className="text-2xs text-s-muted ml-auto hidden md:flex items-center gap-3">
+        <select className="ctl" value={conf} onChange={(e) => setConf(e.target.value)} aria-label="Filter by conference">
+          <option value="all">All conferences</option>
+          {confs.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <span className="text-2xs text-s-muted ml-auto hidden lg:flex items-center gap-3">
           <span className="inline-flex items-center gap-1"><span style={{ width: 2, height: 12, background: "var(--color-muted)", display: "inline-block" }} />Vegas</span>
           <span className="inline-flex items-center gap-1"><span style={{ width: 14, height: 6, borderRadius: 3, background: "var(--heat-green)", display: "inline-block" }} />projection</span>
           {started && <span className="inline-flex items-center gap-1"><span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-text)", display: "inline-block" }} />actual</span>}
@@ -85,9 +168,7 @@ export default function WinsView() {
       <p className="text-2xs text-s-muted mt-3 leading-relaxed max-w-3xl">
         Each bar runs from the Vegas win total to our model&apos;s projection; the logo sits at the projection.
         Green = we&apos;re over the number, copper = under. The dot is the team&apos;s actual win count once the
-        season is underway. The model (ridge regression on prior Elo, SP+, returning production, recruiting,
-        transfer-portal haul, and strength of schedule) matches Vegas&apos;s accuracy out-of-sample (RMSE ≈ 2.4
-        wins) and beats the over/under ~53% of the time when it shows an edge.
+        season is underway.
       </p>
     </>
   );

@@ -179,6 +179,32 @@ table, .tabular {
 .win-axis { position: relative; height: 16px; margin-left: 70px; margin-right: 52px; }
 .win-axis span { position: absolute; transform: translateX(-50%); font-size: 0.55rem; color: var(--color-muted); }
 
+/* ── model explainer (how it works + accuracy) ───────────────────────────── */
+.model-panel { border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); margin-bottom: 16px; overflow: hidden; }
+.model-panel > summary {
+  cursor: pointer; list-style: none; padding: 12px 16px; font-weight: 700; font-size: 0.85rem;
+  display: flex; align-items: center; gap: 8px; user-select: none;
+}
+.model-panel > summary::-webkit-details-marker { display: none; }
+.model-panel > summary::before { content: "▸"; color: var(--color-accent); transition: transform 0.15s ease; }
+.model-panel[open] > summary::before { transform: rotate(90deg); }
+.model-panel .body { padding: 0 16px 16px; }
+.feat-bars { display: grid; grid-template-columns: minmax(120px, 160px) 1fr auto; gap: 5px 10px; align-items: center; margin: 10px 0; }
+.feat-bars .fn { font-size: 0.72rem; font-weight: 600; }
+.feat-bars .ft { height: 9px; border-radius: 5px; }
+.feat-bars .fv { font-size: 0.66rem; font-weight: 700; color: var(--color-muted); font-variant-numeric: tabular-nums; }
+.metric-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; margin-top: 6px; }
+.metric-table th, .metric-table td { padding: 5px 10px; text-align: right; border-bottom: 1px solid var(--color-border); }
+.metric-table th:first-child, .metric-table td:first-child { text-align: left; color: var(--color-muted); font-weight: 600; }
+.metric-table thead th { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); }
+.metric-table .best { color: var(--heat-green); font-weight: 800; }
+.edge-chart { display: flex; align-items: flex-end; gap: 12px; height: 130px; padding: 6px 0 0; position: relative; }
+.edge-chart .col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; flex: 1; max-width: 84px; }
+.edge-chart .bar { width: 100%; border-radius: 5px 5px 0 0; background: var(--heat-green); min-height: 2px; }
+.edge-chart .bl { font-size: 0.62rem; font-weight: 700; margin-bottom: 3px; }
+.edge-chart .cap { font-size: 0.58rem; color: var(--color-muted); margin-top: 4px; text-align: center; line-height: 1.2; }
+.edge-base { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--color-muted); }
+
 /* recharts theming */
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   border: 1px solid var(--color-border) !important; border-radius: 10px !important;
