@@ -109,23 +109,46 @@ function GameCard({ g }: { g: Game }) {
 export default function GamesView() {
   const [season, setSeason] = useState<string>(defaultSeason);
   const [week, setWeek] = useState<number>(() => defaultWeek(defaultSeason()));
+  const [q, setQ] = useState("");
 
   const weeks = useMemo(() => weeksFor(season), [season]);
   const idx = weeks.indexOf(week);
+  const query = q.trim().toLowerCase();
+  const searching = query.length > 0;
 
   function changeSeason(s: string) { setSeason(s); setWeek(defaultWeek(s)); }
   function step(d: number) { const ni = idx + d; if (ni >= 0 && ni < weeks.length) setWeek(weeks[ni]); }
 
-  const byDay = useMemo(() => {
-    const games = (GAMES[season] ?? []).filter((g) => g.wk === week);
+  const byTime = (a: Game, b: Game) =>
+    a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || (b.hwp - 0.5) ** 2 - (a.hwp - 0.5) ** 2;
+
+  // when searching: matching games across the whole season, grouped by week.
+  // otherwise: the selected week's games, grouped by day.
+  const groups = useMemo(() => {
+    const all = GAMES[season] ?? [];
+    if (searching) {
+      const hit = (g: Game) => {
+        const a = team(g.away), h = team(g.home);
+        return `${a.name} ${a.abbr} ${h.name} ${h.abbr}`.toLowerCase().includes(query);
+      };
+      const map = new Map<number, Game[]>();
+      for (const g of all.filter(hit).sort((a, b) => a.wk - b.wk || byTime(a, b))) {
+        if (!map.has(g.wk)) map.set(g.wk, []);
+        map.get(g.wk)!.push(g);
+      }
+      return Array.from(map.entries()).map(([wk, games]) => ({ key: `w${wk}`, heading: `Week ${wk}`, games }));
+    }
     const map = new Map<string, Game[]>();
-    for (const g of games.sort((a, b) =>
-      a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || (b.hwp - 0.5) ** 2 - (a.hwp - 0.5) ** 2)) {
+    for (const g of all.filter((g) => g.wk === week).sort(byTime)) {
       if (!map.has(g.date)) map.set(g.date, []);
       map.get(g.date)!.push(g);
     }
-    return Array.from(map.entries());
-  }, [season, week]);
+    return Array.from(map.entries()).map(([date, games]) => ({
+      key: date, heading: `${fmtDay(date, games[0].day)} · ${games.length} game${games.length === 1 ? "" : "s"}`, games,
+    }));
+  }, [season, week, query, searching]);
+
+  const total = useMemo(() => groups.reduce((n, g) => n + g.games.length, 0), [groups]);
 
   return (
     <>
@@ -133,23 +156,27 @@ export default function GamesView() {
         <select className="ctl" value={season} onChange={(e) => changeSeason(e.target.value)}>
           {GAMES_SEASONS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
-        <div className="segment items-center">
-          <button onClick={() => step(-1)} disabled={idx <= 0} style={{ opacity: idx <= 0 ? 0.35 : 1 }}>‹ Prev</button>
-          <span className="px-3 font-bold text-sm tabular-nums">Week {week}</span>
-          <button onClick={() => step(1)} disabled={idx >= weeks.length - 1} style={{ opacity: idx >= weeks.length - 1 ? 0.35 : 1 }}>Next ›</button>
+        <div className="segment items-center" style={{ opacity: searching ? 0.4 : 1 }}>
+          <button onClick={() => step(-1)} disabled={searching || idx <= 0} style={{ opacity: idx <= 0 ? 0.35 : 1 }}>‹ Prev</button>
+          <span className="px-3 font-bold text-sm tabular-nums">{searching ? "All weeks" : `Week ${week}`}</span>
+          <button onClick={() => step(1)} disabled={searching || idx >= weeks.length - 1} style={{ opacity: idx >= weeks.length - 1 ? 0.35 : 1 }}>Next ›</button>
         </div>
-        <span className="text-2xs text-s-muted ml-auto hidden sm:block">Copy any game as an image with the icon on its card.</span>
+        <input className="ctl w-40" placeholder="Search team…" value={q} onChange={(e) => setQ(e.target.value)} />
+        {searching && <button className="pill on" onClick={() => setQ("")}>Clear</button>}
+        <span className="text-2xs text-s-muted ml-auto hidden sm:block">
+          {searching ? `${total} game${total === 1 ? "" : "s"} match` : "Copy any game as an image with the icon on its card."}
+        </span>
       </div>
 
-      {byDay.map(([date, games]) => (
-        <div key={date} className="mb-5">
-          <div className="section-heading">{fmtDay(date, games[0].day)} · {games.length} game{games.length === 1 ? "" : "s"}</div>
+      {groups.map(({ key, heading, games }) => (
+        <div key={key} className="mb-5">
+          <div className="section-heading">{heading}</div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {games.map((g) => <GameCard key={`${g.away}-${g.home}-${g.date}`} g={g} />)}
           </div>
         </div>
       ))}
-      {byDay.length === 0 && <p className="text-s-muted text-sm">No games for this week.</p>}
+      {groups.length === 0 && <p className="text-s-muted text-sm">{searching ? "No games match that team." : "No games for this week."}</p>}
 
       <p className="text-2xs text-s-muted mt-2">
         Data through {GAMES_UPDATED}. Win probability from both teams&apos; Elo (home field +65 Elo unless a
