@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import {
   GAMES, GAMES_SEASONS, GAMES_UPDATED, TEAMS, team, weeksFor, defaultWeek, defaultSeason, fmtTime, fmtDay, type Game,
 } from "../lib/games";
+import { gameCardPng } from "../lib/cardImage";
 
 function swing(win: number, loss: number) {
   return (
@@ -40,6 +41,42 @@ function TeamRow({ id, elo, pct, win, loss, score, isHome, played, isTop }:
   );
 }
 
+function ShareButton({ g }: { g: Game }) {
+  const [state, setState] = useState<"idle" | "busy" | "copied" | "saved">("idle");
+  async function share() {
+    if (state === "busy") return;
+    setState("busy");
+    let blob: Blob;
+    try { blob = await gameCardPng(g); } catch { setState("idle"); return; }
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      setState("copied");
+    } catch {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${team(g.away).abbr}-at-${team(g.home).abbr}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      setState("saved");
+    }
+    setTimeout(() => setState("idle"), 1800);
+  }
+  const done = state === "copied" || state === "saved";
+  return (
+    <button onClick={share} title="Copy game as image"
+      className="shrink-0 -mr-1 -mt-0.5 w-6 h-6 flex items-center justify-center rounded-md text-s-muted hover:text-s-text hover:bg-s-hover transition-colors"
+      style={{ opacity: state === "busy" ? 0.5 : 1 }}>
+      {done ? (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--heat-green)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+      ) : (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 function GameCard({ g }: { g: Game }) {
   const played = g.hs != null && g.as != null;
   const homeTop = played ? (g.hs as number) >= (g.as as number) : g.hwp >= 0.5;
@@ -49,7 +86,10 @@ function GameCard({ g }: { g: Game }) {
     <div className="stat-card !p-3">
       <div className="flex items-center justify-between text-2xs text-s-muted mb-1">
         <span>{fmtTime(g.time)}{g.neutral ? " · neutral site" : ""}</span>
-        <span>{played ? "Final" : "Win probability"}</span>
+        <div className="flex items-center gap-1.5">
+          <span>{played ? "Final" : "Win probability"}</span>
+          <ShareButton g={g} />
+        </div>
       </div>
       <TeamRow id={g.away} elo={g.ae} pct={awayPct} win={g.aWin} loss={g.aLoss} score={g.as} isHome={false} played={played} isTop={!homeTop} />
       {!played && (() => {
@@ -98,7 +138,7 @@ export default function GamesView() {
           <span className="px-3 font-bold text-sm tabular-nums">Week {week}</span>
           <button onClick={() => step(1)} disabled={idx >= weeks.length - 1} style={{ opacity: idx >= weeks.length - 1 ? 0.35 : 1 }}>Next ›</button>
         </div>
-        <span className="text-2xs text-s-muted ml-auto hidden sm:block">Win % &amp; Elo swings from each team&apos;s pre-game Elo.</span>
+        <span className="text-2xs text-s-muted ml-auto hidden sm:block">Copy any game as an image with the icon on its card.</span>
       </div>
 
       {byDay.map(([date, games]) => (
