@@ -75,6 +75,10 @@ jobs:
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
         run: python scripts/build_data.py
 
+      - name: Rebuild games / matchups (ESPN)
+        if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
+        run: python scripts/build_games.py
+
       - name: Rebuild win totals + actual playoff brackets (CFBD)
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'
         env:
