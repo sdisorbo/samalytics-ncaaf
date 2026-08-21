@@ -53,6 +53,38 @@ function BinnedSuccess() {
   );
 }
 
+const CONF_COLOR: Record<string, string> = { High: "var(--heat-green)", Medium: "var(--color-accent)", Low: "var(--color-muted)" };
+
+function ConfidencePanel() {
+  const c = m.confidence || [];
+  return (
+    <div className="mb-5">
+      <div className="section-heading">Accuracy by confidence · out-of-sample</div>
+      <div className="space-y-1.5 max-w-md">
+        {c.map((x) => {
+          const w = Math.max(3, Math.min(100, ((x.acc - 45) / 12) * 100));
+          return (
+            <div key={x.level} className="flex items-center gap-2 text-2xs">
+              <span className="w-16 shrink-0 font-bold" style={{ color: CONF_COLOR[x.level] }}>{x.level}</span>
+              <span className="w-14 shrink-0 text-s-muted">{x.range}</span>
+              <div className="flex-1 h-3.5 rounded relative" style={{ background: "color-mix(in srgb, var(--color-border) 40%, transparent)" }}>
+                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${w}%`, background: CONF_COLOR[x.level], borderRadius: 3 }} />
+                <div style={{ position: "absolute", left: `${((52.4 - 45) / 12) * 100}%`, top: -2, bottom: -2, width: 1, background: "var(--color-text)", opacity: 0.55 }} title="52.4% break-even" />
+              </div>
+              <span className="w-20 text-right"><b style={{ color: CONF_COLOR[x.level] }}>{x.acc}%</b> <span className="text-s-muted">n={x.n}</span></span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-2xs text-s-muted mt-1.5 max-w-md leading-relaxed">
+        Confidence is the size of ALICE&apos;s disagreement with the line. High-confidence picks (at least 4
+        points off the number) have cleared the 52.4% break-even (thin line) out-of-sample; small edges are coin
+        flips. Very large gaps get noisy, often the model missing news the market already has.
+      </p>
+    </div>
+  );
+}
+
 function BucketCoverage() {
   const bins = m.bucket_cov || [];
   const maxDev = Math.max(2, ...bins.map((b) => Math.abs(b.home_cover - 50)));
@@ -133,6 +165,7 @@ function HowItWorks() {
           </tbody>
         </table>
 
+        <ConfidencePanel />
         <div className="grid md:grid-cols-2 gap-6">
           <SeasonCurve />
           <BinnedSuccess />
@@ -167,6 +200,7 @@ function GamesTable({ games }: { games: AliceGame[] }) {
             <th className="text-right font-semibold px-2" title="Consensus home spread">Vegas</th>
             <th className="text-right font-semibold px-2" title="ALICE home spread">ALICE</th>
             <th className="text-right font-semibold px-2">Edge</th>
+            <th className="text-center font-semibold px-2">Conf</th>
             <th className="text-left font-semibold px-2">Pick</th>
             <th className="text-right font-semibold pl-2">Result</th>
           </tr>
@@ -190,6 +224,12 @@ function GamesTable({ games }: { games: AliceGame[] }) {
                 <td className="px-2 text-right">
                   <span className="inline-block rounded px-1.5 py-0.5 font-bold tabular-nums"
                     style={{ background: edgeBg, color: t > 0.4 ? "#fff" : "var(--color-accent)" }}>{g.edge}</span>
+                </td>
+                <td className="px-2 text-center">
+                  <span className="text-2xs font-bold px-1.5 py-0.5 rounded" style={{
+                    background: g.conf === "High" ? "var(--heat-green)" : g.conf === "Medium" ? "color-mix(in srgb, var(--color-accent) 16%, transparent)" : "transparent",
+                    color: g.conf === "High" ? "#fff" : g.conf === "Medium" ? "var(--color-accent)" : "var(--color-muted)",
+                  }}>{g.conf}</span>
                 </td>
                 <td className="px-2">
                   <span className="inline-flex items-center gap-1 text-2xs font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--color-accent)", color: "#fff" }}>
@@ -220,10 +260,15 @@ export default function ModelsView() {
   const [season, setSeason] = useState(ALICE.latest);
   const weeks = useMemo(() => aliceWeeks(season), [season]);
   const [week, setWeek] = useState<number>(weeks[0]);
+  const [highOnly, setHighOnly] = useState(false);
   useEffect(() => { setWeek(aliceWeeks(season)[0]); }, [season]);
   const idx = weeks.indexOf(week);
 
-  const games = useMemo(() => (ALICE.games[season] ?? []).filter((g) => g.week === week), [season, week]);
+  const games = useMemo(() => {
+    let gs = (ALICE.games[season] ?? []).filter((g) => g.week === week);
+    if (highOnly) gs = gs.filter((g) => g.conf === "High");
+    return gs;
+  }, [season, week, highOnly]);
 
   return (
     <>
@@ -258,6 +303,7 @@ export default function ModelsView() {
               <span className="px-3 font-bold text-sm tabular-nums">Week {week}</span>
               <button onClick={() => idx < weeks.length - 1 && setWeek(weeks[idx + 1])} disabled={idx >= weeks.length - 1} style={{ opacity: idx >= weeks.length - 1 ? 0.35 : 1 }}>Next ›</button>
             </div>
+            <button className={`pill ${highOnly ? "on" : ""}`} onClick={() => setHighOnly((v) => !v)}>High confidence only</button>
             <span className="text-2xs text-s-muted ml-auto hidden sm:block">Spreads are the home line. Biggest disagreements first.</span>
           </div>
 

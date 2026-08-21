@@ -10,10 +10,11 @@ export type AliceMetrics = {
   edge_bins: EdgeBin[]; season_curve: { season: number; points: CurvePoint[] };
   features: Feature[]; seasons: string;
   bucket_cov: { label: string; n: number; home_cover: number }[];
+  confidence: { level: string; range: string; n: number; acc: number }[];
 };
 export type AliceGame = {
   week: number; home: string; away: string; homeConf?: string; awayConf?: string;
-  vegas: number; alice: number; edge: number; pick: "away" | "home";
+  vegas: number; alice: number; edge: number; pick: "away" | "home"; conf: "High" | "Medium" | "Low";
   result?: { hp: number; ap: number; margin: number }; correct?: boolean;
 };
 export type TeamMeta = { abbr: string; logo: string | null; color: string };

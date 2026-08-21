@@ -318,14 +318,28 @@ def main():
     print("  by edge:", {b['label']: f"{b['acc']}% (n={b['n']})" for b in edge_bins})
     print("  top features:", [f["name"] for f in feats[:5]])
 
+    # confidence from the edge (how far ALICE is from the line); tuned to the
+    # out-of-sample accuracy curve — moderate edges are the model's sweet spot.
+    def conf_tier(e):
+        return "High" if e >= 4 else "Medium" if e >= 2 else "Low"
+
+    # accuracy by confidence tier (out-of-sample)
+    confidence = []
+    for lvl, rng in (("High", "edge ≥ 4"), ("Medium", "edge 2-4"), ("Low", "edge < 2")):
+        gg = [g for g in graded if conf_tier(g["edge"]) == lvl]
+        if gg:
+            confidence.append({"level": lvl, "range": rng, "n": len(gg),
+                               "acc": round(100 * sum(x["correct"] for x in gg) / len(gg), 1)})
+
     # ── per-game predictions for the site ────────────────────────────────────
     def game_row(P, r, played):
         g = r["g"]; S = g["spread"]; vmargin = -S
         alice_spread = round(-P, 1)
         pick = "away" if P < vmargin else "home"
+        edge = round(abs(P - vmargin), 1)
         out = {"week": g["week"], "home": g["home"], "away": g["away"],
                "homeConf": g["homeConf"], "awayConf": g["awayConf"],
-               "vegas": round(S, 1), "alice": alice_spread, "edge": round(abs(P - vmargin), 1), "pick": pick}
+               "vegas": round(S, 1), "alice": alice_spread, "edge": edge, "pick": pick, "conf": conf_tier(edge)}
         if played:
             margin = g["hp"] - g["ap"]
             out["result"] = {"hp": g["hp"], "ap": g["ap"], "margin": margin}
@@ -352,6 +366,7 @@ def main():
         "f1": round(f1, 3), "precision": round(prec, 3), "recall": round(rec, 3), "balanced_acc": round(bal, 3),
         "edge_bins": edge_bins, "season_curve": {"season": int(curve_season), "points": curve},
         "features": feats, "seasons": f"{min(yr)}-{max(yr)}", "bucket_cov": bucket_cov,
+        "confidence": confidence,
     }
 
     OUT.mkdir(exist_ok=True)
