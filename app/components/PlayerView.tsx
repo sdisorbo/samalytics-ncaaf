@@ -9,7 +9,7 @@ type Pass = { att: number; cmp: number; yds: number; td: number; int: number; pc
 type Season = { year: number; team: string; conference?: string; position?: string; epa: Epa; rec: Rec | null; rush: Rush | null; pass: Pass | null };
 type PlayerData = { id: string; name: string; position: string; teams: string[]; seasons: Season[]; note?: string };
 
-const SKILL = new Set(["WR", "TE", "RB", "FB"]);
+const SKILL = new Set(["QB", "WR", "TE", "RB", "FB"]);
 const n0 = (v: number) => Math.round(v).toLocaleString();
 const n1 = (v: number) => (Math.round(v * 10) / 10).toLocaleString();
 
@@ -67,9 +67,9 @@ export default function PlayerView({ id, name, team, pos }: { id: string; name: 
               <tr key={x.year} className="border-t" style={{ borderColor: "var(--color-border)" }}>
                 <td className="py-2 pr-2 font-bold">{x.year}</td>
                 <td className="px-2 text-s-muted">{x.team}</td>
-                {hasPass && <Cells v={x.pass ? [x.pass.cmp, x.pass.att, x.pass.yds, x.pass.td, x.pass.int] : null} />}
-                {hasRush && <Cells v={x.rush ? [x.rush.car, x.rush.yds, x.rush.ypc, x.rush.td] : null} fmt={[n0, n0, n1, n0]} />}
-                {hasRec && <Cells v={x.rec ? [x.rec.rec, x.rec.yds, x.rec.ypr, x.rec.td, x.rec.long] : null} fmt={[n0, n0, n1, n0, n0]} />}
+                {hasPass && <Cells n={5} v={x.pass ? [x.pass.cmp, x.pass.att, x.pass.yds, x.pass.td, x.pass.int] : null} />}
+                {hasRush && <Cells n={4} v={x.rush ? [x.rush.car, x.rush.yds, x.rush.ypc, x.rush.td] : null} fmt={[n0, n0, n1, n0]} />}
+                {hasRec && <Cells n={5} v={x.rec ? [x.rec.rec, x.rec.yds, x.rec.ypr, x.rec.td, x.rec.long] : null} fmt={[n0, n0, n1, n0, n0]} />}
                 <td className="px-2 text-right font-bold" style={{ color: "var(--heat-green)" }}>{n1(x.epa.total)}</td>
                 <td className="pl-2 text-right">{x.epa.perPlay.toFixed(2)}</td>
               </tr>
@@ -77,9 +77,9 @@ export default function PlayerView({ id, name, team, pos }: { id: string; name: 
             <tr className="border-t-2 font-bold" style={{ borderColor: "var(--color-border)" }}>
               <td className="py-2 pr-2">Career</td>
               <td className="px-2" />
-              {hasPass && <Cells v={[tot.cmp, tot.att, tot.passYds, tot.passTd, tot.intc]} />}
-              {hasRush && <Cells v={[tot.car, tot.rushYds, tot.car ? tot.rushYds / tot.car : 0, tot.rushTd]} fmt={[n0, n0, n1, n0]} />}
-              {hasRec && <Cells v={[tot.rec, tot.recYds, tot.rec ? tot.recYds / tot.rec : 0, tot.recTd, 0]} fmt={[n0, n0, n1, n0, () => ""]} />}
+              {hasPass && <Cells n={5} v={[tot.cmp, tot.att, tot.passYds, tot.passTd, tot.intc]} />}
+              {hasRush && <Cells n={4} v={[tot.car, tot.rushYds, tot.car ? tot.rushYds / tot.car : 0, tot.rushTd]} fmt={[n0, n0, n1, n0]} />}
+              {hasRec && <Cells n={5} v={[tot.rec, tot.recYds, tot.rec ? tot.recYds / tot.rec : 0, tot.recTd, 0]} fmt={[n0, n0, n1, n0, () => ""]} />}
               <td className="px-2 text-right" style={{ color: "var(--heat-green)" }}>{n1(tot.epa)}</td>
               <td className="pl-2 text-right text-s-muted" />
             </tr>
@@ -96,13 +96,15 @@ export default function PlayerView({ id, name, team, pos }: { id: string; name: 
 function Group({ cols }: { cols: string[] }) {
   return <>{cols.map((c, i) => <th key={c} className={`text-right font-semibold px-2 ${i === 0 ? "border-l" : ""}`} style={i === 0 ? { borderColor: "var(--color-border)" } : undefined}>{c}</th>)}</>;
 }
-function Cells({ v, fmt }: { v: (number)[] | null; fmt?: ((n: number) => string)[] }) {
-  const f = (i: number, x: number) => (fmt && fmt[i] ? fmt[i](x) : n0(x));
-  return <>{(v ?? [null, null, null, null, null]).map((x, i) => (
-    <td key={i} className={`px-2 text-right ${i === 0 ? "border-l" : ""}`} style={i === 0 ? { borderColor: "var(--color-border)" } : undefined}>
-      {x == null ? <span className="text-s-muted">-</span> : f(i, x as number)}
-    </td>
-  ))}</>;
+function Cells({ n, v, fmt }: { n: number; v: (number)[] | null; fmt?: ((x: number) => string)[] }) {
+  return <>{Array.from({ length: n }).map((_, i) => {
+    const x = v ? v[i] : null;
+    return (
+      <td key={i} className={`px-2 text-right ${i === 0 ? "border-l" : ""}`} style={i === 0 ? { borderColor: "var(--color-border)" } : undefined}>
+        {x == null ? <span className="text-s-muted">-</span> : (fmt && fmt[i] ? fmt[i](x) : n0(x))}
+      </td>
+    );
+  })}</>;
 }
 
 function Loading({ name, team, pos }: { name: string; team: string; pos: string }) {

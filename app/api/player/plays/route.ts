@@ -25,6 +25,8 @@ export async function GET(req: Request) {
   const name = sp.get("n") || "";
   const year = sp.get("year") || "";
   const team = sp.get("team") || "";
+  const pos = sp.get("pos") || "";
+  const isQB = pos === "QB";
   if (!name || !year || !team) return NextResponse.json({ error: "missing n/year/team" }, { status: 400 });
   const target = norm(name);
 
@@ -37,17 +39,21 @@ export async function GET(req: Request) {
     return c === target || c.startsWith(target) || (target.length > 6 && c.includes(target));
   };
 
-  const out: { type: "rec" | "rush"; yards: number; ppa: number; down: number; td: boolean }[] = [];
+  const out: { type: "rec" | "rush" | "pass"; yards: number; ppa: number; down: number; td: boolean }[] = [];
   for (const plays of byWeek) {
     for (const p of plays) {
       const t = p.playText || "";
       const td = /touchdown|\btd\b/i.test(t);
       const ppa = typeof p.ppa === "number" ? p.ppa : 0;
       const down = p.down || 0;
-      const rec = t.match(new RegExp(`pass complete to (.+?) for ${GAIN}`, "i"));
-      if (rec && matches(rec[1])) {
-        const y = parseGain(rec[2]); if (y != null) out.push({ type: "rec", yards: y, ppa, down, td });
-        continue;
+      // completions: "<passer> pass complete to <receiver> for <gain>"
+      const cmp = t.match(new RegExp(`^(.+?) pass complete to (.+?) for ${GAIN}`, "i"));
+      if (cmp) {
+        const y = parseGain(cmp[3]);
+        if (y != null) {
+          if (isQB && matches(cmp[1])) { out.push({ type: "pass", yards: y, ppa, down, td }); continue; }
+          if (!isQB && matches(cmp[2])) { out.push({ type: "rec", yards: y, ppa, down, td }); continue; }
+        }
       }
       const run = t.match(new RegExp(`^(.+?) (?:run|rush) for ${GAIN}`, "i"));
       if (run && matches(run[1])) {

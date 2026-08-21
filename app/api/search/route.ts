@@ -18,6 +18,8 @@ export async function GET(req: Request) {
     ]);
 
     const ql = q.toLowerCase();
+    const logoOf = new Map(teams.map((t) => [t.school?.toLowerCase(), (t.logos && t.logos[0]) || null]));
+
     const teamHits = teams
       .filter((t) => t.school?.toLowerCase().includes(ql) || t.abbreviation?.toLowerCase() === ql || t.mascot?.toLowerCase().includes(ql))
       .slice(0, 6)
@@ -33,7 +35,7 @@ export async function GET(req: Request) {
       const key = `${p.name}|${p.team}|${p.position}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      playerHits.push({ id: p.id, name: p.name, team: p.team, position: p.position || "" });
+      playerHits.push({ id: p.id, name: p.name, team: p.team, position: p.position || "", logo: logoOf.get(p.team?.toLowerCase()) || null });
       if (playerHits.length >= 20) break;
     }
 

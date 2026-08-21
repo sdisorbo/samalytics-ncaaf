@@ -2,10 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type PlayerHit = { id: string; name: string; team: string; position: string };
+type PlayerHit = { id: string; name: string; team: string; position: string; logo: string | null };
 type TeamHit = { school: string; conference?: string; logo: string | null; color: string };
 
-const SKILL = new Set(["WR", "TE", "RB", "FB"]);
+const SKILL = new Set(["QB", "WR", "TE", "RB", "FB"]);
 
 export default function GlobalSearch() {
   const [open, setOpen] = useState(false);
@@ -88,11 +88,12 @@ export default function GlobalSearch() {
                   <div className="px-4 py-1 text-2xs uppercase tracking-wide text-s-muted font-bold">Players</div>
                   {players.map((p) => (
                     <button key={p.id + p.team} onClick={() => go(`/player/${p.id}?n=${encodeURIComponent(p.name)}&t=${encodeURIComponent(p.team)}&p=${encodeURIComponent(p.position)}`)}
-                      className="w-full flex items-center gap-3 px-4 py-2 hover:bg-s-hover text-left transition-colors">
-                      <span className="w-9 shrink-0 text-2xs font-bold text-center rounded px-1 py-0.5"
+                      className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-s-hover text-left transition-colors">
+                      <span className="w-8 shrink-0 text-2xs font-bold text-center rounded px-1 py-0.5"
                         style={{ background: SKILL.has(p.position) ? "var(--color-accent)" : "var(--color-border)", color: SKILL.has(p.position) ? "#fff" : "var(--color-muted)" }}>
                         {p.position || "?"}
                       </span>
+                      {p.logo ? <img src={p.logo} alt="" width={20} height={20} className="object-contain shrink-0" /> : <span style={{ width: 20 }} className="shrink-0" />}
                       <span className="text-sm font-semibold truncate">{p.name}</span>
                       <span className="text-2xs text-s-muted ml-auto shrink-0">{p.team}</span>
                     </button>
