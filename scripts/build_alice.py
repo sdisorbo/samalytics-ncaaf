@@ -20,6 +20,7 @@ REBEL is a coming-soon placeholder).
 Usage: python scripts/build_alice.py
 """
 import json
+import math
 import re
 import time
 from collections import defaultdict, deque
@@ -41,9 +42,12 @@ SEED = 17
 ROLL = 5            # rolling-window length (games)
 MIN_HIST = 3        # need at least this many prior games for a usable row
 
-# per-team, per-game box features we roll
-FEATS = ["yards", "tds", "penYds", "retYds", "kickPts", "turnovers", "takeaways",
-         "sacks", "epa", "rushes", "passes", "points", "firstDowns"]
+# v2 inputs: opponent-adjusted Elo (computed inline) + rolled EFFICIENCY, instead
+# of the original noisy raw box-score means. EFF is rolled 5 games per team.
+EFF = ["epaOff", "epaDef", "points", "turnovers", "yards"]
+
+# Elo (matches build_data.py so it's the same opponent-adjusted rating)
+BASE, K, HFA, CARRY = 1500.0, 42.0, 65.0, 0.70
 
 
 def _int(v, idx=None):
@@ -98,7 +102,8 @@ def load_games(year):
                 "home": g["homeTeam"], "away": g["awayTeam"],
                 "homeConf": g.get("homeConference"), "awayConf": g.get("awayConference"),
                 "hp": g.get("homePoints"), "ap": g.get("awayPoints"),
-                "box": {}, "epa": {}, "spread": None,
+                "neutral": bool(g.get("neutralSite", False)),
+                "box": {}, "epaOff": {}, "epaDef": {}, "spread": None,
             }
         for gt in cfbd.get("/games/teams", year=year, week=wk, classification="fbs"):
             gid = gt["id"]
@@ -111,7 +116,9 @@ def load_games(year):
             gid = pp.get("gameId")
             if gid in games:
                 off = (pp.get("offense") or {}).get("overall")
-                games[gid]["epa"][pp["team"]] = float(off) if off is not None else 0.0
+                dff = (pp.get("defense") or {}).get("overall")
+                games[gid]["epaOff"][pp["team"]] = float(off) if off is not None else 0.0
+                games[gid]["epaDef"][pp["team"]] = float(dff) if dff is not None else 0.0
         for ln in cfbd.get("/lines", year=year, week=wk):
             gid = ln.get("id")
             if gid in games:
@@ -119,14 +126,33 @@ def load_games(year):
     return list(games.values())
 
 
-def team_vec(g, team):
+def eff_vec(g, team):
+    """5-number efficiency snapshot for one team in one game."""
     b = g["box"].get(team, {})
-    v = {f: b.get(f, 0.0) for f in FEATS if f not in ("epa",)}
-    v["epa"] = g["epa"].get(team, 0.0)
-    return [v[f] for f in FEATS]
+    return [g["epaOff"].get(team, 0.0), g["epaDef"].get(team, 0.0),
+            b.get("points", 0.0), b.get("turnovers", 0.0), b.get("yards", 0.0)]
 
 
-FEAT_NAMES = ["vegas_spread"] + [f"home_{f}" for f in FEATS] + [f"away_{f}" for f in FEATS]
+def win_prob(a, b, hfa):
+    return 1.0 / (1.0 + 10.0 ** (-((a + hfa) - b) / 400.0))
+
+
+def elo_update(eh, ea, sh, sa, neutral):
+    hfa = 0.0 if neutral else HFA
+    exp = win_prob(eh, ea, hfa)
+    if sh > sa:
+        s, w, l = 1.0, eh + hfa, ea
+    elif sh < sa:
+        s, w, l = 0.0, ea, eh + hfa
+    else:
+        s, w, l = 0.5, eh + hfa, ea
+    mult = math.log(max(abs(sh - sa), 1) + 1.0) * (2.2 / ((w - l) * 0.001 + 2.2))
+    d = K * mult * (s - exp)
+    return eh + d, ea - d
+
+
+FEAT_NAMES = (["vegas spread", "home Elo", "away Elo", "Elo edge"]
+              + [f"home {f}" for f in EFF] + [f"away {f}" for f in EFF])
 XGB_PARAMS = dict(n_estimators=450, learning_rate=0.03, max_depth=3, subsample=0.8,
                   colsample_bytree=0.8, reg_lambda=2.5, min_child_weight=6,
                   random_state=SEED, verbosity=0)
@@ -153,26 +179,31 @@ def main():
     # chronological order for the rolling window (spans seasons)
     all_games.sort(key=lambda g: (g["date"] or f"{g['year']}-99"))
 
-    hist = defaultdict(lambda: deque(maxlen=ROLL))   # team -> deque of feature vectors
-    rows = []                                        # usable rows (played + has line + history)
-    upcoming = []                                    # future games to predict (no result yet)
+    hist = defaultdict(lambda: deque(maxlen=ROLL))   # team -> deque of efficiency vectors
+    elo = defaultdict(lambda: BASE)                  # team -> opponent-adjusted rating
+    rows, upcoming, cur = [], [], None
 
     for g in all_games:
+        if g["year"] != cur:                         # offseason: regress Elo toward the mean
+            if cur is not None:
+                for t in list(elo):
+                    elo[t] = BASE + CARRY * (elo[t] - BASE)
+            cur = g["year"]
+        he, ae = elo[g["home"]], elo[g["away"]]
         hv, av = team_vec_or_none(hist, g["home"]), team_vec_or_none(hist, g["away"])
         played = g["hp"] is not None and g["ap"] is not None
-        has_feat = hv is not None and av is not None and g["spread"] is not None
-        if has_feat:
-            feat = [g["spread"]] + hv + av
+        if hv is not None and av is not None and g["spread"] is not None:
+            feat = [g["spread"], round(he), round(ae), round(he - ae)] + hv + av
             rec = {"g": g, "feat": feat}
             if played:
                 rec["margin"] = g["hp"] - g["ap"]
                 rows.append(rec)
             else:
                 upcoming.append(rec)
-        # update history with this game's actual box (only if played)
-        if played:
-            hist[g["home"]].append(team_vec(g, g["home"]))
-            hist[g["away"]].append(team_vec(g, g["away"]))
+        if played:  # only played games update history + Elo
+            hist[g["home"]].append(eff_vec(g, g["home"]))
+            hist[g["away"]].append(eff_vec(g, g["away"]))
+            elo[g["home"]], elo[g["away"]] = elo_update(he, ae, g["hp"], g["ap"], g["neutral"])
 
     print(f"\nusable training rows: {len(rows)} | upcoming to predict: {len(upcoming)}")
     if not HAVE_XGB or len(rows) < 500:

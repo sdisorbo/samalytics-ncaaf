@@ -62,11 +62,12 @@ function HowItWorks() {
       <div className="body">
         <p className="text-2xs text-s-muted leading-relaxed max-w-3xl">
           ALICE (Adaptive spread Learning with xGBoost Corrective Error) is a gradient-boosted regressor that
-          predicts a game&apos;s home margin from the Vegas spread plus each team&apos;s 5-game rolling form:
-          yards, TDs, penalty and return yards, kicking, turnovers, takeaways, sacks, EPA, rushes, passes,
-          points and first downs, for home and away. Early-season games roll into the prior year, so week 1
-          leans on last season. It bets whichever side the model thinks covers. Trained {m.seasons}, graded
-          out-of-sample leave-one-season-out against the consensus line. What moves it most:
+          predicts a game&apos;s home margin. This build upgrades the original&apos;s noisy raw box scores to
+          opponent-adjusted inputs: the Vegas spread, each team&apos;s Elo rating (the same engine as our Elo
+          page), and their 5-game rolling efficiency (offensive and defensive EPA, points, turnovers, yards).
+          Early-season games roll into the prior year, so week 1 leans on last season. It bets whichever side it
+          projects to cover. Trained {m.seasons}, graded out-of-sample leave-one-season-out against the
+          consensus line. What moves it most:
         </p>
 
         <div className="feat-bars">
@@ -84,8 +85,10 @@ function HowItWorks() {
           <b style={{ color: beats ? "var(--heat-green)" : "var(--heat-purple)" }}>{m.accuracy}%</b>{" "}
           (95% CI {m.ci_low}-{m.ci_high}%) against a <b>{m.break_even}%</b> break-even. That is a coin flip: the
           single-season 56% from the 2022 write-up was variance and does not replicate out-of-sample (2021 is
-          actually {"<"}50% here). The college spread market is efficient, and rolling box-score form does not
-          beat it. This page reports that straight rather than curve-fitting a winner.
+          actually {"<"}50% here). The closing line is efficient: even opponent-adjusted Elo and EPA can&apos;t
+          beat it, because the market already prices them in. The one signal that does clear break-even is line
+          movement itself: following the market from the opening number to the close hits ~54% (and ~64% on
+          3-point-plus moves). This page reports that straight rather than curve-fitting a winner.
         </div>
 
         <table className="metric-table mb-4">
