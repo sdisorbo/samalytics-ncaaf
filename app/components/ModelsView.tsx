@@ -62,10 +62,11 @@ function HowItWorks() {
       <div className="body">
         <p className="text-2xs text-s-muted leading-relaxed max-w-3xl">
           ALICE (Adaptive spread Learning with xGBoost Corrective Error) is a gradient-boosted regressor that
-          predicts a game&apos;s home margin. This build upgrades the original&apos;s noisy raw box scores to
-          opponent-adjusted inputs: the Vegas spread, each team&apos;s Elo rating (the same engine as our Elo
-          page), and their 5-game rolling efficiency (offensive and defensive EPA, points, turnovers, yards).
-          Early-season games roll into the prior year, so week 1 leans on last season. It bets whichever side it
+          predicts a game&apos;s home margin. It upgrades the original&apos;s noisy raw box scores to
+          opponent-adjusted inputs: the Vegas spread, each team&apos;s Elo (the same engine as our Elo page),
+          5-game rolling efficiency (offensive and defensive EPA, points, turnovers, and rush/pass yards gained
+          and allowed), and preseason 247 team talent + recruiting-class strength. Early-season games roll into
+          the prior year, so week 1 leans on last season and the talent priors. It bets whichever side it
           projects to cover. Trained {m.seasons}, graded out-of-sample leave-one-season-out against the
           consensus line. What moves it most:
         </p>

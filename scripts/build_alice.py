@@ -42,9 +42,14 @@ SEED = 17
 ROLL = 5            # rolling-window length (games)
 MIN_HIST = 3        # need at least this many prior games for a usable row
 
-# v2 inputs: opponent-adjusted Elo (computed inline) + rolled EFFICIENCY, instead
-# of the original noisy raw box-score means. EFF is rolled 5 games per team.
-EFF = ["epaOff", "epaDef", "points", "turnovers", "yards"]
+# v3 inputs: opponent-adjusted Elo + rolled efficiency (incl. rush/pass, offense
+# AND defense-allowed) + 247 talent / recruiting. Replaces the original's noisy raw
+# box means (penalty/return yards were tested and dropped — they hurt). EFF rolls 5
+# games per team; "def*" = what the opponent did against this team.
+EFF = ["epaOff", "epaDef", "points", "turnovers", "yards", "offRush", "offPass", "defRush", "defPass"]
+EFF_DISP = {"epaOff": "off EPA", "epaDef": "def EPA", "points": "points", "turnovers": "turnovers",
+            "yards": "yards", "offRush": "rush yds", "offPass": "pass yds",
+            "defRush": "rush yds allowed", "defPass": "pass yds allowed"}
 
 # Elo (matches build_data.py so it's the same opponent-adjusted rating)
 BASE, K, HFA, CARRY = 1500.0, 42.0, 65.0, 0.70
@@ -66,16 +71,9 @@ def team_box(teamobj):
     st = {s["category"]: s.get("stat") for s in teamobj.get("stats", [])}
     return {
         "yards": _int(st.get("totalYards")),
-        "tds": _int(st.get("rushingTDs")) + _int(st.get("passingTDs")),
-        "penYds": _int(st.get("totalPenaltiesYards"), 1),
-        "retYds": _int(st.get("puntReturnYards")),
-        "kickPts": _int(st.get("kickingPoints")),
+        "rushYds": _int(st.get("rushingYards")),
+        "passYds": _int(st.get("netPassingYards")),
         "turnovers": _int(st.get("turnovers")),
-        "takeaways": _int(st.get("fumblesRecovered")) + _int(st.get("passesIntercepted")),
-        "sacks": _int(st.get("sacks")),
-        "rushes": _int(st.get("rushingAttempts")),
-        "passes": _int(st.get("completionAttempts"), 1),
-        "firstDowns": _int(st.get("firstDowns")),
     }
 
 
@@ -126,11 +124,13 @@ def load_games(year):
     return list(games.values())
 
 
-def eff_vec(g, team):
-    """5-number efficiency snapshot for one team in one game."""
-    b = g["box"].get(team, {})
+def eff_vec(g, team, opp):
+    """Efficiency snapshot for one team in one game. Defense = what `opp` did to us."""
+    b = g["box"].get(team, {}); ob = g["box"].get(opp, {})
     return [g["epaOff"].get(team, 0.0), g["epaDef"].get(team, 0.0),
-            b.get("points", 0.0), b.get("turnovers", 0.0), b.get("yards", 0.0)]
+            b.get("points", 0.0), b.get("turnovers", 0.0), b.get("yards", 0.0),
+            b.get("rushYds", 0.0), b.get("passYds", 0.0),
+            ob.get("rushYds", 0.0), ob.get("passYds", 0.0)]
 
 
 def win_prob(a, b, hfa):
@@ -152,7 +152,8 @@ def elo_update(eh, ea, sh, sa, neutral):
 
 
 FEAT_NAMES = (["vegas spread", "home Elo", "away Elo", "Elo edge"]
-              + [f"home {f}" for f in EFF] + [f"away {f}" for f in EFF])
+              + [f"home {EFF_DISP[f]}" for f in EFF] + [f"away {EFF_DISP[f]}" for f in EFF]
+              + ["home talent", "away talent", "talent edge", "home recruiting", "away recruiting"])
 XGB_PARAMS = dict(n_estimators=450, learning_rate=0.03, max_depth=3, subsample=0.8,
                   colsample_bytree=0.8, reg_lambda=2.5, min_child_weight=6,
                   random_state=SEED, verbosity=0)
@@ -176,6 +177,14 @@ def main():
         all_games += gs
         print(f"  {y}: {len(gs)} games, {sum(1 for g in gs if g['spread'] is not None)} with a line")
 
+    # 247 talent + recruiting points per (year, team) — leak-free preseason priors
+    talent, recruit = {}, {}
+    for y in seasons:
+        for x in cfbd.get("/talent", year=y):
+            talent[(y, x["team"])] = float(x.get("talent") or 0)
+        for x in cfbd.get("/recruiting/teams", year=y):
+            recruit[(y, x["team"])] = float(x.get("points") or 0)
+
     # chronological order for the rolling window (spans seasons)
     all_games.sort(key=lambda g: (g["date"] or f"{g['year']}-99"))
 
@@ -193,7 +202,10 @@ def main():
         hv, av = team_vec_or_none(hist, g["home"]), team_vec_or_none(hist, g["away"])
         played = g["hp"] is not None and g["ap"] is not None
         if hv is not None and av is not None and g["spread"] is not None:
-            feat = [g["spread"], round(he), round(ae), round(he - ae)] + hv + av
+            th, ta = talent.get((g["year"], g["home"]), 0.0), talent.get((g["year"], g["away"]), 0.0)
+            rh, ra = recruit.get((g["year"], g["home"]), 0.0), recruit.get((g["year"], g["away"]), 0.0)
+            feat = ([g["spread"], round(he), round(ae), round(he - ae)] + hv + av
+                    + [th, ta, th - ta, rh, ra])
             rec = {"g": g, "feat": feat}
             if played:
                 rec["margin"] = g["hp"] - g["ap"]
@@ -201,8 +213,8 @@ def main():
             else:
                 upcoming.append(rec)
         if played:  # only played games update history + Elo
-            hist[g["home"]].append(eff_vec(g, g["home"]))
-            hist[g["away"]].append(eff_vec(g, g["away"]))
+            hist[g["home"]].append(eff_vec(g, g["home"], g["away"]))
+            hist[g["away"]].append(eff_vec(g, g["away"], g["home"]))
             elo[g["home"]], elo[g["away"]] = elo_update(he, ae, g["hp"], g["ap"], g["neutral"])
 
     print(f"\nusable training rows: {len(rows)} | upcoming to predict: {len(upcoming)}")
