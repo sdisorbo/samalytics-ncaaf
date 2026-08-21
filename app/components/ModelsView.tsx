@@ -53,6 +53,38 @@ function BinnedSuccess() {
   );
 }
 
+function BucketCoverage() {
+  const bins = m.bucket_cov || [];
+  const maxDev = Math.max(2, ...bins.map((b) => Math.abs(b.home_cover - 50)));
+  return (
+    <div className="mt-6">
+      <div className="section-heading">How each spread range has actually covered · home team, {m.seasons}</div>
+      <div className="space-y-1 max-w-xl">
+        {bins.map((b) => {
+          const dev = b.home_cover - 50, over = dev >= 0;
+          const w = (Math.abs(dev) / maxDev) * 50;
+          return (
+            <div key={b.label} className="flex items-center gap-2 text-2xs">
+              <span className="w-24 shrink-0 text-s-muted">{b.label}</span>
+              <div className="flex-1 relative h-3.5 rounded" style={{ background: "color-mix(in srgb, var(--color-border) 40%, transparent)" }}>
+                <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 1, background: "var(--color-muted)", opacity: 0.6 }} />
+                <div style={{ position: "absolute", top: 2, bottom: 2, [over ? "left" : "right"]: "50%", width: `${w}%`, background: over ? "var(--heat-green)" : "var(--heat-purple)", borderRadius: 2 }} />
+              </div>
+              <span className="w-10 text-right font-semibold tabular-nums">{b.home_cover}%</span>
+              <span className="w-14 text-right text-s-muted">n={b.n}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="text-2xs text-s-muted mt-2 leading-relaxed max-w-xl">
+        Home dogs cover a touch more, big favorites and heavy dogs a touch less (the classic home-dog tilt). But
+        every bar is within noise of 50%, and feeding this to the model as a feature did not move accuracy: the
+        spread already encodes it, and the small biases don&apos;t hold up out-of-sample.
+      </p>
+    </div>
+  );
+}
+
 function HowItWorks() {
   const maxImp = Math.max(...m.features.map((f) => f.importance)) || 1;
   const beats = m.accuracy >= m.break_even;
@@ -105,6 +137,7 @@ function HowItWorks() {
           <SeasonCurve />
           <BinnedSuccess />
         </div>
+        <BucketCoverage />
         <p className="text-2xs text-s-muted mt-3">F1 {m.f1} · precision {m.precision} · recall {m.recall} · balanced accuracy {m.balanced_acc}. Data live-refreshed from CollegeFootballData; updated {MODELS_UPDATED}.</p>
       </div>
     </details>

@@ -292,6 +292,19 @@ def main():
         wins += g["correct"]
         curve.append({"i": k, "units": round(units, 2), "acc": round(100 * wins / k, 1)})
 
+    # historical spread-bucket coverage (descriptive) — how often the home team has
+    # actually covered by spread range. Shown for context; not a betting edge.
+    bkt_defs = [(-99, -21, "Home fav 21+"), (-21, -14, "Fav 14-21"), (-14, -10, "Fav 10-14"),
+                (-10, -7, "Fav 7-10"), (-7, -3.5, "Fav 3.5-7"), (-3.5, -0.5, "Fav 0.5-3.5"),
+                (-0.5, 0.5, "Pick'em"), (0.5, 3.5, "Dog 0.5-3.5"), (3.5, 7, "Dog 3.5-7"),
+                (7, 10, "Dog 7-10"), (10, 14, "Dog 10-14"), (14, 99, "Dog 14+")]
+    bucket_cov = []
+    for lo, hi, lab in bkt_defs:
+        gm = [r for r in rows if lo <= r["g"]["spread"] < hi and r["margin"] != -r["g"]["spread"]]
+        if len(gm) >= 30:
+            cov = sum(1 for r in gm if r["margin"] > -r["g"]["spread"])
+            bucket_cov.append({"label": lab, "n": len(gm), "home_cover": round(100 * cov / len(gm), 1)})
+
     # full-sample model for feature importance + upcoming predictions
     full = xgb.XGBRegressor(**XGB_PARAMS); full.fit(X, y)
     imp = full.feature_importances_
@@ -338,7 +351,7 @@ def main():
         "home": {"n": len(hm), "acc": round(100 * sum(g["correct"] for g in hm) / max(len(hm), 1), 1)},
         "f1": round(f1, 3), "precision": round(prec, 3), "recall": round(rec, 3), "balanced_acc": round(bal, 3),
         "edge_bins": edge_bins, "season_curve": {"season": int(curve_season), "points": curve},
-        "features": feats, "seasons": f"{min(yr)}-{max(yr)}",
+        "features": feats, "seasons": f"{min(yr)}-{max(yr)}", "bucket_cov": bucket_cov,
     }
 
     OUT.mkdir(exist_ok=True)

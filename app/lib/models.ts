@@ -9,6 +9,7 @@ export type AliceMetrics = {
   f1: number; precision: number; recall: number; balanced_acc: number;
   edge_bins: EdgeBin[]; season_curve: { season: number; points: CurvePoint[] };
   features: Feature[]; seasons: string;
+  bucket_cov: { label: string; n: number; home_cover: number }[];
 };
 export type AliceGame = {
   week: number; home: string; away: string; homeConf?: string; awayConf?: string;
