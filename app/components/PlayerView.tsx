@@ -7,7 +7,8 @@ type Rec = { rec: number; yds: number; td: number; ypr: number; long: number };
 type Rush = { car: number; yds: number; td: number; ypc: number; long: number };
 type Pass = { att: number; cmp: number; yds: number; td: number; int: number; pct: number };
 type Season = { year: number; team: string; conference?: string; position?: string; epa: Epa; rec: Rec | null; rush: Rush | null; pass: Pass | null };
-type PlayerData = { id: string; name: string; position: string; teams: string[]; seasons: Season[]; note?: string };
+type PlayerData = { id: string; name: string; position: string; teams: string[]; seasons: Season[];
+  teamMeta?: Record<string, { logo: string | null; color: string }>; headshot?: string; note?: string };
 
 const SKILL = new Set(["QB", "WR", "TE", "RB", "FB"]);
 const n0 = (v: number) => Math.round(v).toLocaleString();
@@ -88,7 +89,9 @@ export default function PlayerView({ id, name, team, pos }: { id: string; name: 
       </div>
       <p className="text-2xs text-s-muted mt-2">EPA = predicted points added (CFBD PPA). Loaded live from the CollegeFootballData API; EPA-era coverage begins 2013.</p>
 
-      {showMap && <DepthMap id={id} name={data.name} position={position} seasons={s.map((x) => ({ year: x.year, team: x.team }))} />}
+      {showMap && <DepthMap id={id} name={data.name} position={position}
+        seasons={s.map((x) => ({ year: x.year, team: x.team }))}
+        teamMeta={data.teamMeta || {}} headshot={data.headshot || null} />}
     </>
   );
 }

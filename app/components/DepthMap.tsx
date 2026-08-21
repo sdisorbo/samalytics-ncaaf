@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { depthMapPng } from "../lib/fieldImage";
 
 type Play = { type: "rec" | "rush" | "pass"; yards: number; ppa: number; down: number; td: boolean };
 type Metric = "volume" | "epa" | "yards";
+type TeamMeta = Record<string, { logo: string | null; color: string }>;
 
 const Y_MIN = -10, Y_MAX = 60, STEP = 5;          // depth domain (yards past LOS)
 const W = 150, H = 470, TOP = 16, BOT = 16;       // skinny field — the horizontal axis is not real
@@ -13,8 +15,9 @@ const hash = (i: number) => { const x = Math.sin(i * 91.7 + 13.1) * 43758.5; ret
 
 const RB = new Set(["RB", "FB"]);
 
-export default function DepthMap({ id, name, position, seasons }:
-  { id: string; name: string; position: string; seasons: { year: number; team: string }[] }) {
+export default function DepthMap({ id, name, position, seasons, teamMeta, headshot }:
+  { id: string; name: string; position: string; seasons: { year: number; team: string }[];
+    teamMeta: TeamMeta; headshot: string | null }) {
   const isQB = position === "QB";
   const isRB = RB.has(position);
   const typeOpts: string[] = isQB ? ["pass", "rush", "both"] : isRB ? ["rush", "rec", "both"] : ["rec"];
@@ -25,6 +28,7 @@ export default function DepthMap({ id, name, position, seasons }:
   const [typeSel, setTypeSel] = useState<string>(typeOpts[0] === "pass" ? "pass" : typeOpts.includes("both") ? "both" : "rec");
   const [plays, setPlays] = useState<Play[] | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "busy" | "copied" | "saved">("idle");
 
   const teamOf = (y: number) => seasons.find((s) => s.year === y)?.team || "";
 
@@ -72,15 +76,59 @@ export default function DepthMap({ id, name, position, seasons }:
   const hv = hover != null ? stats.b[hover] : null;
   const dotColor = (p: Play) => (p.type === "rush" ? "#111827" : "#ffffff");
 
+  async function copyMap() {
+    if (copyState === "busy" || !plays || !year) return;
+    setCopyState("busy");
+    const total = shown.length;
+    let blob: Blob;
+    try {
+      blob = await depthMapPng({
+        name, position, team: teamOf(year), season: year,
+        typeLabel: typeOpts.length === 1 ? "Receiving" : typeLabel[typeSel], metric,
+        headshot, teamLogo: teamMeta[teamOf(year)]?.logo || null, teamColor: teamMeta[teamOf(year)]?.color || "#7A7A7A",
+        plays: shown,
+        stats: {
+          plays: total,
+          avgDepth: total ? shown.reduce((a, p) => a + p.yards, 0) / total : 0,
+          epaPerPlay: total ? shown.reduce((a, p) => a + p.ppa, 0) / total : 0,
+        },
+        stuffed: isRB ? stuffed : null,
+      });
+    } catch { setCopyState("idle"); return; }
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      setCopyState("copied");
+    } catch {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${name.replace(/\s+/g, "-")}-${year}-field.png`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      setCopyState("saved");
+    }
+    setTimeout(() => setCopyState("idle"), 1800);
+  }
+  const copied = copyState === "copied" || copyState === "saved";
+
   return (
     <div className="mt-7">
       <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <h2 className="text-lg font-black tracking-tight">
           {isQB ? "Passing chart" : "Field map"} <span className="text-s-muted font-normal text-sm">· depth past the LOS</span>
         </h2>
-        <select className="ctl" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-          {seasons.map((s) => <option key={s.year} value={s.year}>{s.year} · {s.team}</option>)}
-        </select>
+        <div className="flex items-center gap-2">
+          <select className="ctl" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {seasons.map((s) => <option key={s.year} value={s.year}>{s.year} · {s.team}</option>)}
+          </select>
+          <button onClick={copyMap} title="Copy field map as image" disabled={!plays || copyState === "busy"}
+            className="pill inline-flex items-center gap-1.5" style={{ opacity: copyState === "busy" ? 0.5 : 1 }}>
+            {copied ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--heat-green)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+            )}
+            {copied ? (copyState === "saved" ? "Saved" : "Copied") : "Copy"}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-3">

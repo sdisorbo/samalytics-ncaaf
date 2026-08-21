@@ -60,7 +60,24 @@ export async function GET(req: Request) {
 
   const teams = Array.from(new Set(found.map((f) => f.ppa.team).filter(Boolean)));
   const position = found[0].ppa.position || posHint;
-  return NextResponse.json({ id, name: name || found[0].ppa.name, position, teams, seasons });
+
+  // team logo/color for the player's teams (for the field-map export)
+  let teamMeta: Record<string, { logo: string | null; color: string }> = {};
+  try {
+    const fbs = await cfbd<{ school: string; color?: string; logos?: string[] }[]>("/teams/fbs");
+    const want = new Set(teams);
+    for (const t of fbs) {
+      if (want.has(t.school)) {
+        teamMeta[t.school] = {
+          logo: (t.logos && t.logos[0]) || null,
+          color: t.color ? (t.color.startsWith("#") ? t.color : `#${t.color}`) : "#7A7A7A",
+        };
+      }
+    }
+  } catch { /* logos optional */ }
+
+  const headshot = `https://a.espncdn.com/i/headshots/college-football/players/full/${id}.png`;
+  return NextResponse.json({ id, name: name || found[0].ppa.name, position, teams, seasons, teamMeta, headshot });
 }
 
 function round(v: number | undefined, d = 1) { if (v == null) return 0; const m = 10 ** d; return Math.round(v * m) / m; }
