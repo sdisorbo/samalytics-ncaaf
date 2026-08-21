@@ -86,6 +86,7 @@ jobs:
         run: |
           python scripts/build_wins.py || echo "build_wins failed — keeping existing wins.json"
           python scripts/build_playoffs.py || echo "build_playoffs failed — keeping existing playoffs.json"
+          python scripts/build_alice.py || echo "build_alice failed — keeping existing models.json"
 
       - name: Commit & push if changed
         if: steps.gate.outputs.in_season == 'true' || github.event_name == 'workflow_dispatch'

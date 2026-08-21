@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/games", label: "Games" },
   { href: "/bracket", label: "Bracket" },
   { href: "/wins", label: "Win Totals" },
+  { href: "/models", label: "Models" },
   { href: "/elo", label: "Elo Ratings" },
 ];
 
