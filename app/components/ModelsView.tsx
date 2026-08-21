@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ALICE, ALICE_SEASONS, aliceWeeks, MODELS_UPDATED, type AliceGame } from "../lib/models";
+import { ALICE, ALICE_SEASONS, aliceWeeks, MODELS_UPDATED, teamMeta, type AliceGame } from "../lib/models";
 
 const m = ALICE.metrics;
 
@@ -113,6 +113,16 @@ function HowItWorks() {
 
 function fmtSpread(s: number) { return s > 0 ? `+${s}` : `${s}`; }
 
+function TeamCell({ school, bold }: { school: string; bold?: boolean }) {
+  const t = teamMeta(school);
+  return (
+    <span className="inline-flex items-center gap-1.5 min-w-0">
+      {t.logo ? <img src={t.logo} alt="" width={18} height={18} className="object-contain shrink-0" /> : <span style={{ width: 18 }} className="shrink-0" />}
+      <span className={`truncate ${bold ? "font-semibold" : "text-s-muted"}`}>{school}</span>
+    </span>
+  );
+}
+
 function GamesTable({ games }: { games: AliceGame[] }) {
   if (!games.length) return <p className="text-s-muted text-sm">No lines posted for this week yet.</p>;
   return (
@@ -130,14 +140,29 @@ function GamesTable({ games }: { games: AliceGame[] }) {
         </thead>
         <tbody>
           {games.map((g, i) => {
-            const pickTeam = g.pick === "away" ? g.away : g.home;
+            const pickTeam = g.pick === "away" ? teamMeta(g.away) : teamMeta(g.home);
+            const t = Math.min(g.edge / 8, 1);          // edge heat 0..1
+            const edgeBg = `rgba(147,47,109,${(0.10 + 0.72 * t).toFixed(3)})`;
             return (
               <tr key={i} className="border-t" style={{ borderColor: "var(--color-border)" }}>
-                <td className="py-2 pr-2"><span className="text-s-muted">{g.away}</span> @ <span className="font-semibold">{g.home}</span></td>
+                <td className="py-2 pr-2">
+                  <div className="flex items-center gap-1.5">
+                    <TeamCell school={g.away} />
+                    <span className="text-2xs text-s-muted">@</span>
+                    <TeamCell school={g.home} bold />
+                  </div>
+                </td>
                 <td className="px-2 text-right">{fmtSpread(g.vegas)}</td>
                 <td className="px-2 text-right font-semibold">{fmtSpread(g.alice)}</td>
-                <td className="px-2 text-right" style={{ color: g.edge >= 3 ? "var(--heat-green)" : "var(--color-muted)" }}>{g.edge}</td>
-                <td className="px-2"><span className="text-2xs font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--color-accent)", color: "#fff" }}>{pickTeam} cover</span></td>
+                <td className="px-2 text-right">
+                  <span className="inline-block rounded px-1.5 py-0.5 font-bold tabular-nums"
+                    style={{ background: edgeBg, color: t > 0.4 ? "#fff" : "var(--color-accent)" }}>{g.edge}</span>
+                </td>
+                <td className="px-2">
+                  <span className="inline-flex items-center gap-1 text-2xs font-bold px-1.5 py-0.5 rounded" style={{ background: "var(--color-accent)", color: "#fff" }}>
+                    {pickTeam.abbr} cover
+                  </span>
+                </td>
                 <td className="pl-2 text-right">
                   {g.result
                     ? <span>{g.result.ap}-{g.result.hp}{g.correct != null && <b style={{ color: g.correct ? "var(--heat-green)" : "var(--heat-purple)", marginLeft: 6 }}>{g.correct ? "✓" : "✗"}</b>}</span>
@@ -153,8 +178,8 @@ function GamesTable({ games }: { games: AliceGame[] }) {
 }
 
 const MODELS = [
-  { key: "alice", name: "ALICE", tag: "Point spread", live: true },
-  { key: "rebel", name: "REBEL", tag: "Coming soon", live: false },
+  { key: "alice", name: "ALICE", tag: "Point spread", live: true, logo: "/alice_logo.png" },
+  { key: "rebel", name: "REBEL", tag: "Coming soon", live: false, logo: null },
 ];
 
 export default function ModelsView() {
@@ -172,10 +197,12 @@ export default function ModelsView() {
       <div className="flex flex-wrap gap-2 mb-5">
         {MODELS.map((mo) => (
           <button key={mo.key} onClick={() => mo.live && setModel(mo.key)} disabled={!mo.live}
-            className="stat-card !py-2 !px-4 text-left transition-colors"
-            style={{ opacity: mo.live ? 1 : 0.55, borderColor: model === mo.key ? "var(--color-accent)" : "var(--color-border)", background: model === mo.key ? "color-mix(in srgb, var(--color-accent) 8%, var(--color-surface))" : undefined }}>
-            <div className="font-black">{mo.name}</div>
-            <div className="text-2xs text-s-muted">{mo.tag}</div>
+            className="stat-card !py-2.5 !px-4 text-left transition-colors flex flex-col justify-center"
+            style={{ minWidth: 140, opacity: mo.live ? 1 : 0.55, borderColor: model === mo.key ? "var(--color-accent)" : "var(--color-border)", background: model === mo.key ? "color-mix(in srgb, var(--color-accent) 8%, var(--color-surface))" : undefined }}>
+            {mo.logo
+              ? <img src={mo.logo} alt={mo.name} style={{ height: 26, width: "auto", objectFit: "contain", objectPosition: "left" }} />
+              : <div className="font-black">{mo.name}</div>}
+            <div className="text-2xs text-s-muted mt-1">{mo.tag}</div>
           </button>
         ))}
       </div>

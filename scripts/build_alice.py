@@ -185,6 +185,18 @@ def main():
         for x in cfbd.get("/recruiting/teams", year=y):
             recruit[(y, x["team"])] = float(x.get("points") or 0)
 
+    # team logo / color / abbr by school name (for the matchup rows)
+    team_meta = {}
+    for y in seasons:
+        for t in cfbd.get("/teams/fbs", year=y):
+            logos = t.get("logos") or []
+            col = t.get("color")
+            team_meta[t["school"]] = {
+                "abbr": t.get("abbreviation") or t["school"],
+                "logo": (logos[0] if logos else None),
+                "color": ("#" + col) if col and not col.startswith("#") else (col or "#7A7A7A"),
+            }
+
     # chronological order for the rolling window (spans seasons)
     all_games.sort(key=lambda g: (g["date"] or f"{g['year']}-99"))
 
@@ -332,6 +344,7 @@ def main():
     OUT.mkdir(exist_ok=True)
     payload = {
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "teams": team_meta,
         "alice": {"metrics": metrics, "games": pred_by_season, "latest": latest,
                   "seasons": sorted(pred_by_season, key=int)},
         "rebel": {"status": "coming_soon"},
