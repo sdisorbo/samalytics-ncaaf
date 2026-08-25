@@ -245,10 +245,11 @@ table, .tabular {
   border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
 .ticker-track { display: inline-flex; align-items: center; white-space: nowrap;
   will-change: transform; animation: ticker-scroll linear infinite; }
+.ticker-wrap:hover { overflow-x: auto; overflow-y: hidden; }
 .ticker-wrap:hover .ticker-track { animation-play-state: paused; }
 @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.ticker-item { display: inline-flex; align-items: center; gap: 5px; padding: 0 13px; height: 32px;
-  font-size: 0.72rem; font-weight: 600; border-right: 1px solid var(--color-border); }
+.ticker-item { display: inline-flex; flex: none; align-items: center; gap: 6px; padding: 0 20px; height: 32px;
+  white-space: nowrap; font-size: 0.72rem; font-weight: 600; border-right: 1px solid var(--color-border); }
 .ticker-item img { width: 16px; height: 16px; object-fit: contain; }
 .ticker-item .tk-when { color: var(--color-muted); font-weight: 500; margin-left: 2px; }
 .ticker-item .tk-sep { color: var(--color-muted); }
